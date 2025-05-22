@@ -1,0 +1,38 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: #111;
+    font-family: sans-serif;
+  }
+  
+  #game-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+  
+  /* Responsive layout adjustments */
+  @media (max-width: 767px) {
+    /* Mobile */
+    #game-container {
+      padding: 0;
+    }
+  }
+  
+  @media (min-width: 768px) and (max-width: 1024px) {
+    /* Tablet */
+    #game-container {
+      padding: 0;
+    }
+  }
+  
+  @media (min-width: 1025px) {
+    /* Desktop */
+    #game-container {
+      padding: 0;
+    }
+  }
+  
