@@ -17,6 +17,11 @@ const gameHeight = 1200;
 const maxTime = 60;
 let currentLevel = 0;
 let selectedIndices = [];
+let isPaused = false;
+let timerRunning = true; //change to false in production.
+rowCrossed = 0;
+topDiff = 0;
+
 
 
 //------------------------     UI state     ------------------------
@@ -24,13 +29,21 @@ const padding = 20;
 const fontSize = 25;
 const btnfontsize = 30;
 const stackFontsize = 30;
-const rowHeight = 70;
-const stackWidth = 70;
-const boxWidth = 70;
+const rowHeight = 100;
+const stackWidth = 100;
+const boxWidth = 100;
+let highlightedY = gameHeight / 2 - rowHeight / 2;
 
 //------------------------     Container state     ------------------------
 let mainContainer, homeContainer, uiContainer;
 
+// Sound Effects using HTML5 Audio
+const scrollSound = new Audio('assets/scroll.mp3');
+const winSound = new Audio('assets/win.mp3');
+const loseSound = new Audio('assets/lose.mp3');
+scrollSound.volume = 0.5; // Quieter for repeated scrolling
+winSound.volume = 0.8;   // Louder for one-time win
+loseSound.volume = 0.8;  // Louder for one-time lose
 
 
 const gameBox = new PIXI.Graphics();
@@ -241,12 +254,64 @@ function createStack(index, letters) {
     container.hitArea = new PIXI.Rectangle(-boxWidth / 2, 0, boxWidth, stackHeight);
     container.cursor = 'pointer';
 
+    let dragging = false;
+    let dragStartY = 0;
+    let lastY = null; // Track the last Y position for sound triggering
+
+    container.on('pointerdown', (event) => {
+        if (isPaused || !timerRunning) return;
+        dragging = true;
+        // Store the global position and adjust for game area scaling
+        const scale = gameArea.scale.x; // Current scale factor of the game area
+        dragStartY = event.data.global.y / scale - container.y;
+    });
+
+    container.on('pointermove', (event) => {
+        if (!dragging) return;
+        const H = letters.length;
+        
+        // Store previous position before updating
+        const previousY = container.y;
+        
+        // Calculate new position, accounting for game area scaling
+        const scale = gameArea.scale.x; // Current scale factor of the game area
+        const newY = event.data.global.y / scale - dragStartY;
+        const minY = gameHeight / 2 - H * rowHeight;
+        const maxY = gameHeight / 2 - rowHeight;
+        container.y = Math.max(minY, Math.min(maxY, newY));
+
+        // Calculate which row the stack is currently aligned with
+        // We need to account for the gameHeight/2 offset in the container positioning
+        const previousRowIndex = Math.round((gameHeight / 2 - previousY - rowHeight) / rowHeight);
+        const currentRowIndex = Math.round((gameHeight / 2 - container.y - rowHeight) / rowHeight);
+        
+        // Play sound when crossing from one row to another
+        if (previousRowIndex !== currentRowIndex) {
+            // Play or restart sound
+            scrollSound.currentTime = 0;
+            scrollSound.play();
+        }
+    });
+
+    container.on('pointerup', () => {
+        if (!dragging) return;
+        dragging = false;
+        scrollSound.pause(); // Stop scroll sound
+        scrollSound.currentTime = 0; // Reset to start
+        //lastY = null; // Reset lastY
+        snapStack(container, letters, index);
+    });
+
+    container.on('pointerupoutside', () => {
+        if (!dragging) return;
+        dragging = false;
+        scrollSound.pause(); // Stop scroll sound
+        scrollSound.currentTime = 0; // Reset to start
+        snapStack(container, letters, index);
+    });
 
     return { container };
-
 }
-
-
 
 function createButton(label, x, y, onClick) {
     const button = new PIXI.Container();
