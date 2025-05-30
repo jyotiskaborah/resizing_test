@@ -17,22 +17,22 @@ const gameHeight = 1200;
 const maxTime = 60;
 let currentLevel = 0;
 let selectedIndices = [];
+let correctPosition = [];
 let isPaused = false;
 let timerRunning = true; //change to false in production.
-rowCrossed = 0;
-topDiff = 0;
+
 
 
 
 //------------------------     UI state     ------------------------
-const padding = 20;
+const padding = 30;
 const fontSize = 25;
 const btnfontsize = 30;
 const stackFontsize = 30;
 const rowHeight = 100;
 const stackWidth = 100;
 const boxWidth = 100;
-let highlightedY = gameHeight / 2 - rowHeight / 2;
+const snapDuration = 200;
 
 //------------------------     Container state     ------------------------
 let mainContainer, homeContainer, uiContainer;
@@ -47,7 +47,7 @@ loseSound.volume = 0.8;  // Louder for one-time lose
 
 
 const gameBox = new PIXI.Graphics();
-gameBox.beginFill(0x444444);
+gameBox.beginFill(0x224444, 0.80);
 gameBox.drawRect(0, 0, gameWidth, gameHeight);
 gameBox.endFill();
 gameArea.addChild(gameBox);
@@ -68,7 +68,7 @@ function scaleGameArea() {
 }
 
 window.addEventListener('resize', scaleGameArea);
-scaleGameArea();
+scaleGameArea();  // run at starting atleast for one time.
 
 // Load Fonts
 console.log('Attempting to load WebFont');
@@ -100,7 +100,7 @@ function initializeGame() {
 function setupHomeScene() {
     homeContainer = new PIXI.Container();
     gameArea.addChild(homeContainer);
-    homeContainer.visible = false;
+    homeContainer.visible = false; //remove in production.
 
     const bg = new PIXI.Graphics();
     bg.beginFill(0xcccc99);
@@ -112,6 +112,7 @@ function setupHomeScene() {
     const logo = new PIXI.Sprite(logoTexture);
     logo.anchor.set(0.5);
     logo.position.set(gameWidth / 2, gameHeight * 0.30);
+    logo.scale.set(1.40);
     homeContainer.addChild(logo);
 
     const playButton = createButton('Play', gameWidth / 2, gameHeight * 0.60, startGame);
@@ -121,6 +122,7 @@ function setupHomeScene() {
 function setupUiScene() {
     uiContainer = new PIXI.Container();
     gameArea.addChild(uiContainer);
+    uiContainer.visible = true; //for debugging only.
 
     let timerText = new PIXI.Text('Time: 60', {
         fontFamily: 'Noto Sans Bengali, Arial',
@@ -148,48 +150,84 @@ function setupUiScene() {
 function setupMainScene() {
     mainContainer = new PIXI.Container();
     gameArea.addChild(mainContainer);
+    mainContainer.visible = true; // for debugging only.
 
     setupHighlight();
 
+// kngrkmrbrtbporkbrtb         for debugging only.    wkjnfeorigergbeijbtreonb
 
-    stacks = [
-      {
-        "letters": [
-          "মে"
+    data = {
+        "puzzle_id": 22,
+        "word": "অসমীয়া",
+        "stacks": [
+          {
+            "letters": [
+              "অ"
+            ],
+            "selected_index": 0,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "letters": [
+              "ৰ"
+            ],
+            "selected_index": 0,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "letters": [
+              "প্ৰা",
+              "খী",
+              "বু",
+              "ও"
+            ],
+            "selected_index": 2,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "letters": [
+              "তি",
+              "স"
+            ],
+            "selected_index": 0,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "letters": [
+              "মী"
+            ],
+            "selected_index": 0,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "letters": [
+              "য়া",
+              "প্ৰা",
+              "বু",
+              "ৰ",
+              "সু"
+            ],
+            "selected_index": 0,
+            "x": 0,
+            "y": 0
+          }
         ],
-        "selectedIndex": 0,
-        "x": 0,
-        "y": 0
-      },
-      {
-        "letters": [
-          "ৰা"
-        ],
-        "selectedIndex": 0,
-        "x": 0,
-        "y": 0
-      },
-      {
-        "letters": [
-          "শে",
-          "ঞ্চ",
-          "ম"
-        ],
-        "selectedIndex": 0,
-        "x": 0,
-        "y": 0
-      },
-      {
-        "letters": [
-          "তি"
-        ],
-        "selectedIndex": 0,
-        "x": 0,
-        "y": 0
+        "correct_position": [0, 0, 2, 1, 0, 0]
       }
-    ];
 
+      correctPosition = data.correct_position;
+      stacks = data.stacks.map(stackData => ({
+          letters: stackData.letters,
+          selectedIndex: stackData.selected_index,
+          container: null // Will be set in setupLevel
+      }));
 
+//  oegijnhbrtbrtbijmrbrt    for debugging only.   veirjngerjnverbveknmben
 
     setupLevel();
 }
@@ -216,11 +254,11 @@ function setupLevel() {
     }
 
     const totalWidth = N * stackWidth;
-    const startX = (gameWidth - totalWidth) / 2 + stackWidth / 2;
+    const startX = (gameWidth - totalWidth) / 2 ;
     stacks.forEach((stack, i) => {
         const k = stack.selectedIndex;
         stack.container.x = startX + i * stackWidth;
-        stack.container.y = gameHeight / 2 - (k * rowHeight + rowHeight);
+        stack.container.y = gameHeight / 2 - (k + 1) * rowHeight;
     });
 
     console.log('Level setup complete');
@@ -235,7 +273,7 @@ function createStack(index, letters) {
         const box = new PIXI.Graphics();
         box.lineStyle(2, 0x000000);
         box.beginFill(0xcccccc);
-        box.drawRect(-boxWidth / 2, i * rowHeight, boxWidth, rowHeight);
+        box.drawRect(0, i * rowHeight, boxWidth, rowHeight);
         box.endFill();
         container.addChild(box);
 
@@ -243,26 +281,24 @@ function createStack(index, letters) {
             fontFamily: 'Noto Sans Bengali, Arial',
             fontSize: stackFontsize,
             fill: 0x000000,
-            align: 'center'
         });
         text.anchor.set(0.5);
-        text.position.set(0, i * rowHeight + rowHeight / 2);
-        container.addChild(text);
+        text.position.set(boxWidth / 2, i * rowHeight + rowHeight / 2);
+        box.addChild(text);
     });
 
     container.eventMode = 'dynamic'; // or 'dynamic' if the container moves frequently
-    container.hitArea = new PIXI.Rectangle(-boxWidth / 2, 0, boxWidth, stackHeight);
+    container.hitArea = new PIXI.Rectangle(0, 0, boxWidth, stackHeight);
     container.cursor = 'pointer';
 
     let dragging = false;
     let dragStartY = 0;
-    let lastY = null; // Track the last Y position for sound triggering
 
     container.on('pointerdown', (event) => {
-        if (isPaused || !timerRunning) return;
+        if (isPaused || !timerRunning || letters.length === 1) return;
         dragging = true;
         // Store the global position and adjust for game area scaling
-        const scale = gameArea.scale.x; // Current scale factor of the game area
+        const scale = gameArea.scale.y; // Current scale factor of the game area
         dragStartY = event.data.global.y / scale - container.y;
     });
 
@@ -274,7 +310,7 @@ function createStack(index, letters) {
         const previousY = container.y;
         
         // Calculate new position, accounting for game area scaling
-        const scale = gameArea.scale.x; // Current scale factor of the game area
+        const scale = gameArea.scale.y; // Current scale factor of the game area
         const newY = event.data.global.y / scale - dragStartY;
         const minY = gameHeight / 2 - H * rowHeight;
         const maxY = gameHeight / 2 - rowHeight;
@@ -296,22 +332,54 @@ function createStack(index, letters) {
     container.on('pointerup', () => {
         if (!dragging) return;
         dragging = false;
-        scrollSound.pause(); // Stop scroll sound
-        scrollSound.currentTime = 0; // Reset to start
-        //lastY = null; // Reset lastY
         snapStack(container, letters, index);
     });
 
     container.on('pointerupoutside', () => {
         if (!dragging) return;
         dragging = false;
-        scrollSound.pause(); // Stop scroll sound
-        scrollSound.currentTime = 0; // Reset to start
         snapStack(container, letters, index);
     });
 
     return { container };
 }
+
+function snapStack(container, letters, index) {
+    const H = letters.length;
+    const baseY = gameHeight / 2 - rowHeight;
+    const k = Math.round((baseY - container.y) / rowHeight);
+    const clampedK = Math.max(0, Math.min(H , k));
+    const targetY = baseY - (clampedK * rowHeight);
+
+    const startTime = Date.now();
+    const startY = container.y;
+
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const t = Math.min(elapsed / snapDuration, 1);
+        const ease = 1 - Math.pow(1 - t, 2);
+        container.y = startY + (targetY - startY) * ease;
+
+        if (t < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            container.y = targetY;
+            stacks[index].selectedIndex = clampedK;
+            selectedIndices[index] = clampedK;
+            checkWin();
+        }
+    }
+    requestAnimationFrame(animate);
+}
+
+function checkWin() {
+    if (selectedIndices.every((index, i) => index === correctPosition[i])) {
+        timerRunning = false;
+        showWinPopup();
+    }
+}
+
+
 
 function createButton(label, x, y, onClick) {
     const button = new PIXI.Container();
@@ -335,9 +403,10 @@ function createButton(label, x, y, onClick) {
     button.x = x;
     button.y = y;
 
+
     button.on('pointerdown', onClick);
-    button.on('pointerover', () => button.tint = 0x45a049); // Darker green on hover
-    button.on('pointerout', () => button.tint = 0xffffff);  // Reset tint
+    button.on('pointerover', () => bg.tint = 0x45a049); // Darker green on hover
+    button.on('pointerout', () => bg.tint = 0xffffff);  // Reset tint
 
     return button;
 }
