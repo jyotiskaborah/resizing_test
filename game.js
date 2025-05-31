@@ -26,6 +26,7 @@ let timerRunning = true; //change to false in production.
 
 //------------------------     UI state     ------------------------
 const padding = 30;
+const popupPadding = 60;
 const fontSize = 25;
 const btnfontsize = 30;
 const stackFontsize = 30;
@@ -33,6 +34,8 @@ const rowHeight = 100;
 const stackWidth = 100;
 const boxWidth = 100;
 const snapDuration = 200;
+const buttonWidth = 360;
+const buttonHeight = 80;
 
 //------------------------     Container state     ------------------------
 let mainContainer, homeContainer, uiContainer;
@@ -270,21 +273,9 @@ function createStack(index, letters) {
     const stackHeight = rowHeight * letters.length;
 
     letters.forEach((letter, i) => {
-        const box = new PIXI.Graphics();
-        box.lineStyle(2, 0x000000);
-        box.beginFill(0xcccccc);
-        box.drawRect(0, i * rowHeight, boxWidth, rowHeight);
-        box.endFill();
+        const box = createBox(letter);
+        box.y = i * rowHeight;
         container.addChild(box);
-
-        const text = new PIXI.Text(letter, {
-            fontFamily: 'Noto Sans Bengali, Arial',
-            fontSize: stackFontsize,
-            fill: 0x000000,
-        });
-        text.anchor.set(0.5);
-        text.position.set(boxWidth / 2, i * rowHeight + rowHeight / 2);
-        box.addChild(text);
     });
 
     container.eventMode = 'dynamic'; // or 'dynamic' if the container moves frequently
@@ -344,6 +335,25 @@ function createStack(index, letters) {
     return { container };
 }
 
+function createBox(letter) {
+    const box = new PIXI.Graphics();
+    box.lineStyle(3, 0x000000);
+    box.beginFill(0xcccccc);
+    box.drawRect(0, 0, boxWidth, rowHeight);
+    box.endFill();
+
+    const text = new PIXI.Text(letter, {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: stackFontsize,
+        fill: 0x000000,
+    });
+    text.anchor.set(0.5);
+    text.position.set(boxWidth / 2, rowHeight / 2);
+    box.addChild(text);
+    
+    return box;
+}
+
 function snapStack(container, letters, index) {
     const H = letters.length;
     const baseY = gameHeight / 2 - rowHeight;
@@ -379,6 +389,59 @@ function checkWin() {
     }
 }
 
+function createPopup(content) {    
+    // Create new popup container
+    let popupContainer = new PIXI.Container();
+    
+    // Semi-transparent background
+    const bg = new PIXI.Graphics();
+    bg.beginFill(0x000000, 0.7);
+    bg.drawRect(0, 0, gameWidth, gameHeight);
+    bg.endFill();
+    popupContainer.addChild(bg);
+    
+    // Popup panel
+    const panel = new PIXI.Graphics();
+    panel.beginFill(0x333333);
+    panel.drawRect(gameWidth / 2 - content.width / 2 - popupPadding, gameHeight / 2 - content.height / 2 - popupPadding, content.width + popupPadding * 2, content.height + popupPadding * 2);
+    panel.endFill();
+    content.position.set(gameWidth / 2 - content.width / 2, gameHeight / 2 - content.height / 2);
+    panel.addChild(content);
+    popupContainer.addChild(panel);
+
+    return popupContainer;
+}
+
+function showWinPopup() {
+    console.log('Congrats');
+
+    const totalWidth = 360;
+    const totalHeight = 300;
+
+    const contentBox = new PIXI.Container();
+    
+    const congratMessageAssamese = new PIXI.Text('অভিনন্দন!', {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize,
+        fill: 0xffffff,
+        align: 'center'
+    });
+    congratMessageAssamese.position.set(totalWidth / 2 - congratMessageAssamese.width / 2, totalHeight * 0.05);
+    contentBox.addChild(congratMessageAssamese);
+
+    const nextLevelButton = createButton('পৰৱৰ্তী স্তৰ\n(Next Level)', totalWidth / 2, totalHeight * 0.80, levelUp);
+    //nextLevelButton.position.set();
+    contentBox.addChild(nextLevelButton);
+    
+    winPopup = createPopup(contentBox);
+
+    mainContainer.addChild(winPopup); 
+}
+
+function levelUp() {
+    currentLevel++;
+}
+
 
 
 function createButton(label, x, y, onClick) {
@@ -386,15 +449,21 @@ function createButton(label, x, y, onClick) {
     button.eventMode = 'static';
     button.cursor = 'pointer';
 
+    const count = (label.match(/\n/g) || []).length;
+    bHeight = buttonHeight + count * 20;
+
     const bg = new PIXI.Graphics();
     bg.beginFill(0x4CAF50);
-    bg.drawRoundedRect(-180, -40, 360, 80, 30);
+    bg.drawRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, bHeight, 30);
     bg.endFill();
     button.addChild(bg);
+
+
 
     const text = new PIXI.Text(label, { 
         fontFamily: 'Noto Sans Bengali, Arial', 
         fill: 'white', 
+        align: 'center',
         fontSize: btnfontsize
     });
     text.anchor.set(0.5);
