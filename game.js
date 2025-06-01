@@ -20,6 +20,7 @@ let selectedIndices = [];
 let correctPosition = [];
 let isPaused = false;
 let timerRunning = true; //change to false in production.
+let isLoading = false;
 
 
 
@@ -37,8 +38,8 @@ const snapDuration = 200;
 const buttonWidth = 360;
 const buttonHeight = 80;
 
-//------------------------     Container state     ------------------------
-let mainContainer, homeContainer, uiContainer;
+//------------------------     Container and button state     ------------------------
+let mainContainer, homeContainer, uiContainer, playPauseButton, timerText, levelText, loadingScreen;
 
 // Sound Effects using HTML5 Audio
 const scrollSound = new Audio('assets/scroll.mp3');
@@ -127,7 +128,7 @@ function setupUiScene() {
     gameArea.addChild(uiContainer);
     uiContainer.visible = true; //for debugging only.
 
-    let timerText = new PIXI.Text('Time: 60', {
+    timerText = new PIXI.Text('Time: 60', {
         fontFamily: 'Noto Sans Bengali, Arial',
         fontSize: fontSize,
         fill: 0xffffff
@@ -135,7 +136,7 @@ function setupUiScene() {
     timerText.position.set(padding, padding);
     uiContainer.addChild(timerText);
 
-    let levelText = new PIXI.Text('Level: 1', {
+    levelText = new PIXI.Text('Level: 1', {
         fontFamily: 'Noto Sans Bengali, Arial',
         fontSize: fontSize,
         fill: 0xffffff
@@ -144,7 +145,7 @@ function setupUiScene() {
     levelText.position.set(gameWidth - padding, padding);
     uiContainer.addChild(levelText);
 
-    const playPauseButton = createButton('Play/Pause', gameWidth / 2, gameHeight * 0.90, togglePause);
+    playPauseButton = createButton('Play/Pause', gameWidth / 2, gameHeight * 0.90, togglePause);
     uiContainer.addChild(playPauseButton);
 
   
@@ -233,6 +234,119 @@ function setupMainScene() {
 //  oegijnhbrtbrtbijmrbrt    for debugging only.   veirjngerjnverbveknmben
 
     setupLevel();
+}
+
+async function loadLevel(levelIndex) {
+    console.log(`Loading level ${levelIndex + 1}`);
+    mainContainer.removeChildren();
+    stacks = [];
+    selectedIndices = [];
+
+    // Show loading screen
+    isLoading = true;
+    showLoadingScreen();
+
+    try {
+        const response = await fetch(`www.nothings.com`);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const data = await response.json();
+
+        if (!data.stacks || !data.correct_position) {
+            showLevelUnavailablePopup(levelIndex + 1, data.message || 'No data available');
+            return;
+        }
+
+        correctPosition = data.correct_position;
+        stacks = data.stacks.map(stackData => ({
+            letters: stackData.letters,
+            selectedIndex: stackData.selected_index,
+            container: null // Will be set in setupLevel
+        }));
+
+        levelStartTime = Date.now();
+        pausedTime = 0;
+        isPaused = false;
+        timerRunning = true;
+        playPauseButton.label = 'Pause';
+        timerText.style.fill = 0xffffff;
+        levelText.text = `Level: ${levelIndex + 1}`;
+
+        setupLevel();
+    } catch (error) {
+        console.error('Failed to load level:', error);
+        showLevelUnavailablePopup(levelIndex + 1, 'Failed to fetch level data');
+    } finally {
+        // Hide loading screen
+        isLoading = false;
+        hideLoadingScreen();
+    }
+}
+
+function showLoadingScreen() {
+    loadingScreen = new PIXI.Container();
+    const bg = new PIXI.Graphics();
+    bg.beginFill(0x000000, 0.7);
+    bg.drawRect(0, 0, gameWidth, gameHeight);
+    bg.endFill();
+    loadingScreen.addChild(bg);
+
+    const loadingText = new PIXI.Text('Loading...', {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize,
+        fill: 0xffffff
+    });
+    loadingText.position.set(gameWidth / 2, gameHeight / 2);
+    loadingScreen.addChild(loadingText);
+    mainContainer.addChild(loadingScreen);
+    
+}
+
+function hideLoadingScreen() {
+    if (loadingScreen) {
+        app.stage.removeChild(loadingScreen);
+        loadingScreen.destroy({ children: true });
+        loadingScreen = null;
+    }
+}
+
+function showLevelUnavailablePopup(level, message) {
+    /*
+    createPopup(
+        { text: `Level ${level} Unavailable`, color: 0xff0000 },
+        message,
+        [{ text: 'Main Menu', onClick: returnToMainMenu }]
+    );
+    
+    timerRunning = false;
+    */
+    console.log('Level unavailable');
+
+    const totalWidth = 700;
+    const totalHeight = 300;
+
+    const contentBox = new PIXI.Container();
+    
+    const failedMessage = new PIXI.Text(`Level ${level} Unavailable!`, {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize * 2,
+        fill: 0xff0000,
+        align: 'center'
+    });
+    failedMessage.position.set(totalWidth / 2 - failedMessage.width / 2, totalHeight * 0.05);
+    contentBox.addChild(failedMessage);
+
+    const retryButton = createButton('Retry', totalWidth / 2, totalHeight * 0.80, retryLevel);
+    contentBox.addChild(retryButton);
+
+    const levelUnavailablePopup = createPopup(contentBox);  
+    mainContainer.addChild(levelUnavailablePopup);
+
+
+}
+
+function retryLevel() {
+    console.log('Retrying level');
+    //place holder for other codes.
 }
 
 function setupHighlight() {
@@ -415,14 +529,14 @@ function createPopup(content) {
 function showWinPopup() {
     console.log('Congrats');
 
-    const totalWidth = 360;
+    let totalWidth = 0;
     const totalHeight = 300;
 
     const contentBox = new PIXI.Container();
     
     const congratMessageAssamese = new PIXI.Text('অভিনন্দন!', {
         fontFamily: 'Noto Sans Bengali, Arial',
-        fontSize: fontSize,
+        fontSize: fontSize * 2,
         fill: 0xffffff,
         align: 'center'
     });
@@ -430,16 +544,68 @@ function showWinPopup() {
     contentBox.addChild(congratMessageAssamese);
 
     const nextLevelButton = createButton('পৰৱৰ্তী স্তৰ\n(Next Level)', totalWidth / 2, totalHeight * 0.80, levelUp);
-    //nextLevelButton.position.set();
     contentBox.addChild(nextLevelButton);
-    
-    winPopup = createPopup(contentBox);
 
-    mainContainer.addChild(winPopup); 
+    // Star container - positioned in the middle
+    let stars = 2;
+    const starContainer = new PIXI.Container();
+    const starFontSize = fontSize * 2;
+    const starSpacing = starFontSize * 1.5; // Space between stars
+    const totalStarsWidth = (3 * starSpacing) - starSpacing; // 3 stars, minus extra spacing
+    
+    // Keep track of animation timers to clear them if needed
+    const animationTimers = [];
+    
+    for (let i = 0; i < 3; i++) {
+        const starChar = i < stars ? '★' : '☆';
+        const star = new PIXI.Text(starChar, {
+            fontSize: starFontSize,
+            fill: 0xffff00
+        });
+        star.anchor.set(0.5);
+        star.x = i * starSpacing;
+        star.y = 0; // Center of the popup (since contentContainer is positioned at center)
+        star.scale.set(0); // Start invisible
+        starContainer.addChild(star);
+        
+        // Animation properties
+        const delay = i * 300; // 300ms delay between each star
+        const duration = 500; // 500ms zoom animation
+        const startScale = 2;
+        const endScale = 1;
+        
+        // Animate star
+        const timerId = setTimeout(() => {
+            let startTime = null;
+            const animateFunction = (delta) => {
+                if (!startTime) startTime = app.ticker.lastTime;
+                const elapsed = app.ticker.lastTime - startTime;
+                const t = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - t, 2); // Ease-out quadratic
+                star.scale.set(startScale + (endScale - startScale) * ease);
+                if (t === 1) {
+                    star.scale.set(endScale);
+                    app.ticker.remove(animateFunction);
+                }
+            };
+            star._animateFunction = animateFunction; // Store reference to remove later if needed
+            app.ticker.add(animateFunction);
+        }, delay);
+        
+        animationTimers.push(timerId);
+    }
+    starContainer.position.set(totalWidth / 2 - starContainer.width / 2, totalHeight * 0.40);
+    contentBox.addChild(starContainer);
+    
+    totalWidth = Math.max(congratMessageAssamese.width, starContainer.width, nextLevelButton.width);
+    winPopup = createPopup(contentBox);
+    mainContainer.addChild(winPopup);
+    winSound.play(); // Play win sound. 
 }
 
 function levelUp() {
     currentLevel++;
+    loadLevel(currentLevel);
 }
 
 
@@ -454,7 +620,7 @@ function createButton(label, x, y, onClick) {
 
     const bg = new PIXI.Graphics();
     bg.beginFill(0x4CAF50);
-    bg.drawRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, bHeight, 30);
+    bg.drawRoundedRect(-buttonWidth / 2, -bHeight / 2, buttonWidth, bHeight, 30);
     bg.endFill();
     button.addChild(bg);
 
@@ -464,7 +630,7 @@ function createButton(label, x, y, onClick) {
         fontFamily: 'Noto Sans Bengali, Arial', 
         fill: 'white', 
         align: 'center',
-        fontSize: btnfontsize
+        fontSize: btnfontsize,
     });
     text.anchor.set(0.5);
     button.addChild(text);
