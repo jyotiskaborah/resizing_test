@@ -310,18 +310,9 @@ function hideLoadingScreen() {
 }
 
 function showLevelUnavailablePopup(level, message) {
-    /*
-    createPopup(
-        { text: `Level ${level} Unavailable`, color: 0xff0000 },
-        message,
-        [{ text: 'Main Menu', onClick: returnToMainMenu }]
-    );
-    
-    timerRunning = false;
-    */
     console.log('Level unavailable');
 
-    const totalWidth = 700;
+    let totalWidth = 0;
     const totalHeight = 300;
 
     const contentBox = new PIXI.Container();
@@ -332,16 +323,18 @@ function showLevelUnavailablePopup(level, message) {
         fill: 0xff0000,
         align: 'center'
     });
-    failedMessage.position.set(totalWidth / 2 - failedMessage.width / 2, totalHeight * 0.05);
+    failedMessage.anchor.set(0.5, 0);
     contentBox.addChild(failedMessage);
 
-    const retryButton = createButton('Retry', totalWidth / 2, totalHeight * 0.80, retryLevel);
+    const retryButton = createButton('Retry', 0, failedMessage.y + failedMessage.height + totalHeight * 0.30, retryLevel);
     contentBox.addChild(retryButton);
+
+    totalWidth = Math.max(failedMessage.width, retryButton.width);
+    failedMessage.x = totalWidth / 2;
+    retryButton.x = totalWidth / 2;
 
     const levelUnavailablePopup = createPopup(contentBox);  
     mainContainer.addChild(levelUnavailablePopup);
-
-
 }
 
 function retryLevel() {
@@ -534,24 +527,21 @@ function showWinPopup() {
 
     const contentBox = new PIXI.Container();
     
-    const congratMessageAssamese = new PIXI.Text('অভিনন্দন!', {
+    congratMessageAssamese = new PIXI.Text('অভিনন্দন!', {
         fontFamily: 'Noto Sans Bengali, Arial',
         fontSize: fontSize * 2,
         fill: 0xffffff,
         align: 'center'
     });
-    congratMessageAssamese.position.set(totalWidth / 2 - congratMessageAssamese.width / 2, totalHeight * 0.05);
+    congratMessageAssamese.anchor.set(0.5, 0);
+    console.log('congratMessageAssamese.width =', congratMessageAssamese.width);
     contentBox.addChild(congratMessageAssamese);
-
-    const nextLevelButton = createButton('পৰৱৰ্তী স্তৰ\n(Next Level)', totalWidth / 2, totalHeight * 0.80, levelUp);
-    contentBox.addChild(nextLevelButton);
 
     // Star container - positioned in the middle
     let stars = 2;
-    const starContainer = new PIXI.Container();
+    starContainer = new PIXI.Container();
     const starFontSize = fontSize * 2;
     const starSpacing = starFontSize * 1.5; // Space between stars
-    const totalStarsWidth = (3 * starSpacing) - starSpacing; // 3 stars, minus extra spacing
     
     // Keep track of animation timers to clear them if needed
     const animationTimers = [];
@@ -562,10 +552,10 @@ function showWinPopup() {
             fontSize: starFontSize,
             fill: 0xffff00
         });
-        star.anchor.set(0.5);
         star.x = i * starSpacing;
         star.y = 0; // Center of the popup (since contentContainer is positioned at center)
         star.scale.set(0); // Start invisible
+        star.anchor.set(0.5);
         starContainer.addChild(star);
         
         // Animation properties
@@ -594,10 +584,26 @@ function showWinPopup() {
         
         animationTimers.push(timerId);
     }
-    starContainer.position.set(totalWidth / 2 - starContainer.width / 2, totalHeight * 0.40);
+    starContainer.position.set(0, congratMessageAssamese.y + congratMessageAssamese.height + totalHeight * 0.20);
+    console.log('StarContainer.width =', starContainer.width);
     contentBox.addChild(starContainer);
+
+
+    nextLevelButton = createButton('পৰৱৰ্তী স্তৰ\n(Next Level)', 0, starContainer.y + starContainer.height + totalHeight * 0.40, levelUp);
+    contentBox.addChild(nextLevelButton);
     
-    totalWidth = Math.max(congratMessageAssamese.width, starContainer.width, nextLevelButton.width);
+    // Calculate the maximum width needed
+    totalWidth = Math.max(
+        congratMessageAssamese.width,
+        nextLevelButton.width,
+        starContainer.width
+    );
+
+    // Position elements horizontally in the center of totalWidth
+    congratMessageAssamese.x = totalWidth / 2;
+    nextLevelButton.x = totalWidth / 2;
+    starContainer.x = totalWidth / 2 - starContainer.width / 2;
+
     winPopup = createPopup(contentBox);
     mainContainer.addChild(winPopup);
     winSound.play(); // Play win sound. 
@@ -607,8 +613,6 @@ function levelUp() {
     currentLevel++;
     loadLevel(currentLevel);
 }
-
-
 
 function createButton(label, x, y, onClick) {
     const button = new PIXI.Container();
@@ -624,8 +628,6 @@ function createButton(label, x, y, onClick) {
     bg.endFill();
     button.addChild(bg);
 
-
-
     const text = new PIXI.Text(label, { 
         fontFamily: 'Noto Sans Bengali, Arial', 
         fill: 'white', 
@@ -637,7 +639,6 @@ function createButton(label, x, y, onClick) {
 
     button.x = x;
     button.y = y;
-
 
     button.on('pointerdown', onClick);
     button.on('pointerover', () => bg.tint = 0x45a049); // Darker green on hover
