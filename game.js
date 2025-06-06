@@ -30,7 +30,7 @@ const padding = 30;
 const popupPadding = 60;
 const fontSize = 25;
 const btnfontsize = 30;
-const stackFontsize = 30;
+const stackFontsize = 40;
 const rowHeight = 100;
 const stackWidth = 100;
 const boxWidth = 100;
@@ -158,82 +158,7 @@ function setupMainScene() {
 
     setupHighlight();
 
-// kngrkmrbrtbporkbrtb         for debugging only.    wkjnfeorigergbeijbtreonb
-
-    data = {
-        "puzzle_id": 22,
-        "word": "অসমীয়া",
-        "stacks": [
-          {
-            "letters": [
-              "অ"
-            ],
-            "selected_index": 0,
-            "x": 0,
-            "y": 0
-          },
-          {
-            "letters": [
-              "ৰ"
-            ],
-            "selected_index": 0,
-            "x": 0,
-            "y": 0
-          },
-          {
-            "letters": [
-              "প্ৰা",
-              "খী",
-              "বু",
-              "ও"
-            ],
-            "selected_index": 2,
-            "x": 0,
-            "y": 0
-          },
-          {
-            "letters": [
-              "তি",
-              "স"
-            ],
-            "selected_index": 0,
-            "x": 0,
-            "y": 0
-          },
-          {
-            "letters": [
-              "মী"
-            ],
-            "selected_index": 0,
-            "x": 0,
-            "y": 0
-          },
-          {
-            "letters": [
-              "য়া",
-              "প্ৰা",
-              "বু",
-              "ৰ",
-              "সু"
-            ],
-            "selected_index": 0,
-            "x": 0,
-            "y": 0
-          }
-        ],
-        "correct_position": [0, 0, 2, 1, 0, 0]
-      }
-
-      correctPosition = data.correct_position;
-      stacks = data.stacks.map(stackData => ({
-          letters: stackData.letters,
-          selectedIndex: stackData.selected_index,
-          container: null // Will be set in setupLevel
-      }));
-
-//  oegijnhbrtbrtbijmrbrt    for debugging only.   veirjngerjnverbveknmben
-
-    setupLevel();
+    loadLevel(currentLevel);
 }
 
 async function loadLevel(levelIndex) {
@@ -247,9 +172,77 @@ async function loadLevel(levelIndex) {
     showLoadingScreen();
 
     try {
-        const response = await fetch(`www.nothings.com`);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
+        if (levelIndex !== 0) {
+
+            const response = await fetch(`www.nothings.com`);
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            const data = await response.json();
+        }
+        else {
+            data = {
+                "puzzle_id": 22,
+                "word": "অসমীয়া",
+                "stacks": [
+                  {
+                    "letters": [
+                      "অ"
+                    ],
+                    "selected_index": 0,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "letters": [
+                      "ৰ"
+                    ],
+                    "selected_index": 0,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "letters": [
+                      "প্ৰা",
+                      "খী",
+                      "বু",
+                      "ও"
+                    ],
+                    "selected_index": 2,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "letters": [
+                      "তি",
+                      "স"
+                    ],
+                    "selected_index": 0,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "letters": [
+                      "মী"
+                    ],
+                    "selected_index": 0,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "letters": [
+                      "য়া",
+                      "প্ৰা",
+                      "বু",
+                      "ৰ",
+                      "সু"
+                    ],
+                    "selected_index": 0,
+                    "x": 0,
+                    "y": 0
+                  }
+                ],
+                "correct_position": [0, 0, 2, 1, 0, 0]
+            }
+        }
 
         if (!data.stacks || !data.correct_position) {
             showLevelUnavailablePopup(levelIndex + 1, data.message || 'No data available');
