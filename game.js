@@ -30,7 +30,7 @@ const padding = 30;
 const popupPadding = 60;
 const fontSize = 25;
 const btnfontsize = 30;
-const stackFontsize = 40;
+const stackFontsize = 30;
 const rowHeight = 100;
 const stackWidth = 100;
 const boxWidth = 100;
@@ -156,8 +156,6 @@ function setupMainScene() {
     gameArea.addChild(mainContainer);
     mainContainer.visible = true; // for debugging only.
 
-    setupHighlight();
-
     loadLevel(currentLevel);
 }
 
@@ -174,9 +172,9 @@ async function loadLevel(levelIndex) {
     try {
         if (levelIndex !== 0) {
 
-            const response = await fetch(`www.nothings.com`);
+            const response = await fetch(`https://jyotiskaborah.pythonanywhere.com/api/game/?level=${levelIndex + 1}`);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-            const data = await response.json();
+            data = await response.json();
         }
         else {
             data = {
@@ -264,6 +262,7 @@ async function loadLevel(levelIndex) {
         timerText.style.fill = 0xffffff;
         levelText.text = `Level: ${levelIndex + 1}`;
 
+        setupHighlight();
         setupLevel();
     } catch (error) {
         console.error('Failed to load level:', error);
