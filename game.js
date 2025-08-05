@@ -15,11 +15,16 @@ const gameHeight = 1200;
 
 //------------------------    Game state    ------------------------
 const maxTime = 60;
+const totalStars = 3;
 let currentLevel = 0;
 let selectedIndices = [];
 let correctPosition = [];
 let isPaused = false;
 let timerRunning = true; //change to false in production.
+// Timer state for countdown
+let timeLeft = maxTime;
+let lastTimerUpdate = Date.now();
+let levelStartTime = Date.now(); // <-- Add this declaration
 let isLoading = false;
 
 
@@ -128,7 +133,7 @@ function setupUiScene() {
     gameArea.addChild(uiContainer);
     uiContainer.visible = true; //for debugging only.
 
-    timerText = new PIXI.Text('Time: 60', {
+    timerText = new PIXI.Text('Timer : 60', {
         fontFamily: 'Noto Sans Bengali, Arial',
         fontSize: fontSize,
         fill: 0xffffff
@@ -136,7 +141,7 @@ function setupUiScene() {
     timerText.position.set(padding, padding);
     uiContainer.addChild(timerText);
 
-    levelText = new PIXI.Text('Level: 1', {
+    levelText = new PIXI.Text('Level : 1', {
         fontFamily: 'Noto Sans Bengali, Arial',
         fontSize: fontSize,
         fill: 0xffffff
@@ -254,13 +259,17 @@ async function loadLevel(levelIndex) {
             container: null // Will be set in setupLevel
         }));
 
-        levelStartTime = Date.now();
+        levelStartTime = Date.now(); // <-- Already set in loadLevel
         pausedTime = 0;
         isPaused = false;
         timerRunning = true;
         playPauseButton.label = 'Pause';
+        // Reset timer state on level start
+        timeLeft = maxTime;
+        lastTimerUpdate = Date.now();
+        timerText.text = `Timer : ${timeLeft}`;
         timerText.style.fill = 0xffffff;
-        levelText.text = `Level: ${levelIndex + 1}`;
+        levelText.text = `Level : ${levelIndex + 1}`;
 
         setupHighlight();
         setupLevel();
@@ -318,19 +327,19 @@ function showLevelUnavailablePopup(level, message) {
     failedMessage.anchor.set(0.5, 0);
     contentBox.addChild(failedMessage);
 
-    const retryButton = createButton('Retry', 0, failedMessage.y + failedMessage.height + totalHeight * 0.30, retryLevel);
-    contentBox.addChild(retryButton);
+    const retryLoading = createButton('Retry', 0, failedMessage.y + failedMessage.height + totalHeight * 0.30, retryLoadingLevel);
+    contentBox.addChild(retryLoading);
 
-    totalWidth = Math.max(failedMessage.width, retryButton.width);
+    totalWidth = Math.max(failedMessage.width, retryLoading.width);
     failedMessage.x = totalWidth / 2;
-    retryButton.x = totalWidth / 2;
+    retryLoading.x = totalWidth / 2;
 
     const levelUnavailablePopup = createPopup(contentBox);  
     mainContainer.addChild(levelUnavailablePopup);
 }
 
-function retryLevel() {
-    console.log('Retrying level');
+function retryLoadingLevel() {
+    console.log('Retrying Loading level');
     //place holder for other codes.
 }
 
@@ -514,6 +523,10 @@ function createPopup(content) {
 function showWinPopup() {
     console.log('Congrats');
 
+    // Calculate time taken and stars
+    const timeTaken = Math.round((Date.now() - levelStartTime) / 1000);
+    let stars = timeTaken <= 20 ? 3 : timeTaken <= 30 ? 2 : 1;
+
     let totalWidth = 0;
     const totalHeight = 300;
 
@@ -530,15 +543,12 @@ function showWinPopup() {
     contentBox.addChild(congratMessageAssamese);
 
     // Star container - positioned in the middle
-    let stars = 2;
     starContainer = new PIXI.Container();
     const starFontSize = fontSize * 2;
     const starSpacing = starFontSize * 1.5; // Space between stars
-    
     // Keep track of animation timers to clear them if needed
     const animationTimers = [];
-    
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < totalStars; i++) {
         const starChar = i < stars ? '★' : '☆';
         const star = new PIXI.Text(starChar, {
             fontSize: starFontSize,
@@ -549,14 +559,11 @@ function showWinPopup() {
         star.scale.set(0); // Start invisible
         star.anchor.set(0.5);
         starContainer.addChild(star);
-        
-        // Animation properties
+        // Animate star
         const delay = i * 300; // 300ms delay between each star
         const duration = 500; // 500ms zoom animation
         const startScale = 2;
         const endScale = 1;
-        
-        // Animate star
         const timerId = setTimeout(() => {
             let startTime = null;
             const animateFunction = (delta) => {
@@ -573,13 +580,11 @@ function showWinPopup() {
             star._animateFunction = animateFunction; // Store reference to remove later if needed
             app.ticker.add(animateFunction);
         }, delay);
-        
         animationTimers.push(timerId);
     }
     starContainer.position.set(0, congratMessageAssamese.y + congratMessageAssamese.height + totalHeight * 0.20);
     console.log('StarContainer.width =', starContainer.width);
     contentBox.addChild(starContainer);
-
 
     nextLevelButton = createButton('পৰৱৰ্তী স্তৰ\n(Next Level)', 0, starContainer.y + starContainer.height + totalHeight * 0.40, levelUp);
     contentBox.addChild(nextLevelButton);
@@ -649,6 +654,26 @@ function togglePause() {
     //pause func yet to copy.
   
 }
+
+app.ticker.add(() => {
+    if (timerRunning && !isPaused) {
+        const now = Date.now();
+        if (now - lastTimerUpdate >= 1000 && timeLeft > 0) {
+            timeLeft--;
+            lastTimerUpdate = now;
+            timerText.text = `Timer : ${timeLeft}`;
+            if (timeLeft <= 5) {
+                timerText.style.fill = 0xff0000; // Red
+            } else {
+                timerText.style.fill = 0xffffff; // White
+            }
+            if (timeLeft === 0) {
+                timerRunning = false;
+                // Optionally handle timeout here (e.g., showLosePopup())
+            }
+        }
+    }
+});
 
 
 //ygguyvhgctrdxweaed45w54edyug98yhyur6dr5d65r6576f87iuhoihoih86rfytg
