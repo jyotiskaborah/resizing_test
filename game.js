@@ -14,7 +14,7 @@ const gameWidth = 800;
 const gameHeight = 1200;
 
 //------------------------    Game state    ------------------------
-const maxTime = 60;
+const maxTime = 10;
 const totalStars = 3;
 let currentLevel = 0;
 let selectedIndices = [];
@@ -26,6 +26,7 @@ let timeLeft = maxTime;
 let lastTimerUpdate = Date.now();
 let levelStartTime = Date.now(); // <-- Add this declaration
 let isLoading = false;
+let correctWord = '';
 
 
 
@@ -273,6 +274,8 @@ async function loadLevel(levelIndex) {
 
         setupHighlight();
         setupLevel();
+        // After loading data in loadLevel
+        correctWord = data.word || '';
     } catch (error) {
         console.error('Failed to load level:', error);
         showLevelUnavailablePopup(levelIndex + 1, 'Failed to fetch level data');
@@ -649,10 +652,96 @@ function startGame() {
     //place holder for other codes.
 }
 
+let pausePopup = null;
+let howToPlayPopup = null;
+
 function togglePause() {
-    console.log('Pausing game');
-    //pause func yet to copy.
-  
+    // Close How to Play popup if open
+    if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
+    isPaused = !isPaused;
+    if (isPaused) {
+        // Show pause menu
+        if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+        const contentBox = new PIXI.Container();
+        const pauseLabel = new PIXI.Text('Paused', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 2,
+            fill: 0xffffff,
+            align: 'center'
+        });
+        pauseLabel.anchor.set(0.5, 0);
+        contentBox.addChild(pauseLabel);
+        // Resume button
+        const resumeButton = createButton('Resume', 0, pauseLabel.height + 60, () => {
+            isPaused = false;
+            if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+        });
+        contentBox.addChild(resumeButton);
+        // End Game button
+        const endButton = createButton('End Game', 0, pauseLabel.height + resumeButton.height + 90, () => {
+            isPaused = false;
+            if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+            mainContainer.visible = false;
+            uiContainer.visible = false;
+            homeContainer.visible = true;
+        });
+        contentBox.addChild(endButton);
+        // How to Play button
+        const howToPlayButton = createButton('How to Play', 0, pauseLabel.height + resumeButton.height + endButton.height + 120, () => {
+            showHowToPlayPopup();
+        });
+        contentBox.addChild(howToPlayButton);
+        // Center all
+        let maxWidth = Math.max(pauseLabel.width, resumeButton.width, endButton.width, howToPlayButton.width);
+        pauseLabel.x = maxWidth / 2;
+        resumeButton.x = maxWidth / 2;
+        endButton.x = maxWidth / 2;
+        howToPlayButton.x = maxWidth / 2;
+        pausePopup = createPopup(contentBox);
+        mainContainer.addChild(pausePopup);
+    } else {
+        // Hide pause menu if unpausing
+        if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+    }
+}
+
+function showHowToPlayPopup() {
+    if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
+    const contentBox = new PIXI.Container();
+    const title = new PIXI.Text('খেলৰ নিয়ম', {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize * 2,
+        fill: 0xffffff,
+        align: 'center'
+    });
+    title.anchor.set(0.5, 0);
+    contentBox.addChild(title);
+    const instructions = new PIXI.Text(
+        'সঠিক শব্দটো গঠন কৰিবলৈ স্তম্ভসমূহ সজাওক।\n\n• স্তম্ভসমূহ ওপৰলৈ বা তললৈ টানি স্থানান্তৰ কৰক।\n• সময়-সীমা শেষ হোৱাৰ আগতে সম্পূৰ্ণ কৰক।\n• সোনকালে শেষ কৰিলে অধিক ষ্টাৰ পাব!',
+        {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 1.2,
+            fill: 0xffff4d,
+            align: 'left',
+            wordWrap: true,
+            wordWrapWidth: 400
+        }
+    );
+    instructions.anchor.set(0.5, 0);
+    instructions.y = title.height + 20;
+    contentBox.addChild(instructions);
+    // Close button
+    const closeButton = createButton('Close', 0, instructions.y + instructions.height + 60, () => {
+        if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
+    });
+    contentBox.addChild(closeButton);
+    // Center all
+    let maxWidth = Math.max(title.width, instructions.width, closeButton.width);
+    title.x = maxWidth / 2;
+    instructions.x = maxWidth / 2;
+    closeButton.x = maxWidth / 2;
+    howToPlayPopup = createPopup(contentBox);
+    mainContainer.addChild(howToPlayPopup);
 }
 
 app.ticker.add(() => {
@@ -669,11 +758,83 @@ app.ticker.add(() => {
             }
             if (timeLeft === 0) {
                 timerRunning = false;
-                // Optionally handle timeout here (e.g., showLosePopup())
+                // Only show lose popup if not already won
+                if (!selectedIndices.every((index, i) => index === correctPosition[i])) {
+                    showLosePopup();
+                }
             }
         }
     }
 });
+
+let losePopup = null;
+
+function showLosePopup() {
+    // Remove any existing lose popup
+    if (losePopup && losePopup.parent) {
+        losePopup.parent.removeChild(losePopup);
+    }
+    // Content for lose popup
+    const contentBox = new PIXI.Container();
+    const loseMessage = new PIXI.Text('আপুনি হাৰি গ’ল!', {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize * 2,
+        fill: 0xff4444,
+        align: 'center'
+    });
+    loseMessage.anchor.set(0.5, 0);
+    contentBox.addChild(loseMessage);
+    // Show correct word
+    if (correctWord) {
+        const wordLabel = new PIXI.Text('Correct Word:', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize,
+            fill: 0xffffff,
+            align: 'center'
+        });
+        wordLabel.anchor.set(0.5, 0);
+        wordLabel.y = loseMessage.height + 20;
+        contentBox.addChild(wordLabel);
+        const wordText = new PIXI.Text(correctWord, {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 1.5,
+            fill: 0xffff00,
+            align: 'center'
+        });
+        wordText.anchor.set(0.5, 0);
+        wordText.y = wordLabel.y + wordLabel.height + 5;
+        contentBox.addChild(wordText);
+    }
+    // Retry button
+    const retryButton = createButton('Retry', 0, loseMessage.y + loseMessage.height + 180, () => {
+        if (losePopup && losePopup.parent) losePopup.parent.removeChild(losePopup);
+        loadLevel(currentLevel);
+    });
+    contentBox.addChild(retryButton);
+    // Home button
+    const homeButton = createButton('Home', 0, retryButton.y + retryButton.height + 20, () => {
+        if (losePopup && losePopup.parent) losePopup.parent.removeChild(losePopup);
+        mainContainer.visible = false;
+        uiContainer.visible = false;
+        homeContainer.visible = true;
+    });
+    contentBox.addChild(homeButton);
+    // Center buttons
+    let maxWidth = Math.max(loseMessage.width, retryButton.width, homeButton.width);
+    loseMessage.x = maxWidth / 2;
+    retryButton.x = maxWidth / 2;
+    homeButton.x = maxWidth / 2;
+    // Center word label and word text if present
+    if (correctWord) {
+        contentBox.children[1].x = maxWidth / 2;
+        contentBox.children[2].x = maxWidth / 2;
+    }
+    // Create and show popup
+    losePopup = createPopup(contentBox);
+    mainContainer.addChild(losePopup);
+    // Optionally play lose sound
+    if (typeof loseSound !== 'undefined') loseSound.play();
+}
 
 
 //ygguyvhgctrdxweaed45w54edyug98yhyur6dr5d65r6576f87iuhoihoih86rfytg
