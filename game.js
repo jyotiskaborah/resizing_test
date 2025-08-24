@@ -173,7 +173,7 @@ async function loadLevel(levelIndex) {
 
     // Show loading screen
     isLoading = true;
-    showLoadingScreen();
+    await showLoadingScreen();
 
     try {
         if (levelIndex !== 0) {
@@ -286,7 +286,7 @@ async function loadLevel(levelIndex) {
     }
 }
 
-function showLoadingScreen() {
+async function showLoadingScreen() {
     loadingScreen = new PIXI.Container();
     const bg = new PIXI.Graphics();
     bg.beginFill(0x000000, 0.7);
@@ -294,19 +294,36 @@ function showLoadingScreen() {
     bg.endFill();
     loadingScreen.addChild(bg);
 
-    const loadingText = new PIXI.Text('Loading...', {
-        fontFamily: 'Noto Sans Bengali, Arial',
-        fontSize: fontSize,
-        fill: 0xffffff
-    });
-    loadingText.position.set(gameWidth / 2, gameHeight / 2);
-    loadingScreen.addChild(loadingText);
-    mainContainer.addChild(loadingScreen);
+    // Load single PNG and rotate it programmatically
+    const spinnerTexture = await PIXI.Assets.load('assets/rotatingQ.png');
+    const spinner = new PIXI.Sprite(spinnerTexture);
+    spinner.anchor.set(0.5);
+    spinner.x = gameWidth / 2;
+    spinner.y = gameHeight / 2;
+    loadingScreen.addChild(spinner);
+
+    // Add rotation animation
+    let rotation = 0;
+    const rotationSpeed = 0.1; // Adjust speed as needed
     
+    const animateSpinner = () => {
+        rotation += rotationSpeed;
+        spinner.rotation = rotation;
+    };
+    
+    // Store the animation function so we can remove it later
+    loadingScreen._animateSpinner = animateSpinner;
+    app.ticker.add(animateSpinner);
+
+    mainContainer.addChild(loadingScreen);
 }
 
 function hideLoadingScreen() {
     if (loadingScreen) {
+        // Remove the spinner animation from ticker
+        if (loadingScreen._animateSpinner) {
+            app.ticker.remove(loadingScreen._animateSpinner);
+        }
         app.stage.removeChild(loadingScreen);
         loadingScreen.destroy({ children: true });
         loadingScreen = null;
