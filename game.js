@@ -19,8 +19,8 @@ const totalStars = 3;
 let currentLevel = 0;
 let selectedIndices = [];
 let correctPosition = [];
-let isPaused = false;
-let timerRunning = true; //change to false in production.
+let isPaused = true;
+let timerRunning = false; //change to false in production.
 // Timer state for countdown
 let timeLeft = maxTime;
 let lastTimerUpdate = Date.now();
@@ -35,6 +35,7 @@ let correctWord = '';
 const padding = 30;
 const popupPadding = 60;
 const fontSize = 25;
+const uiFontSize = 30; // UI element font size
 const btnfontsize = 30;
 const stackFontsize = 30;
 const rowHeight = 100;
@@ -110,7 +111,7 @@ function initializeGame() {
 function setupHomeScene() {
     homeContainer = new PIXI.Container();
     gameArea.addChild(homeContainer);
-    homeContainer.visible = false; //remove in production.
+    homeContainer.visible = true; //remove in production.
 
     const bg = new PIXI.Graphics();
     bg.beginFill(0xcccc99);
@@ -125,31 +126,118 @@ function setupHomeScene() {
     logo.scale.set(1.40);
     homeContainer.addChild(logo);
 
-    const playButton = createButton('Play', gameWidth / 2, gameHeight * 0.60, startGame);
-    homeContainer.addChild(playButton);
+    const startButton = createButton('Start Game', gameWidth / 2, gameHeight * 0.5, startGame);
+    homeContainer.addChild(startButton);
+
+    const howtoPlayButton = createButton('How to Play', gameWidth / 2, gameHeight * 0.65, () => {
+        showHowToPlayPopup();
+    });
+    homeContainer.addChild(howtoPlayButton);
+
+    // Add help icon at right bottom corner
+    const helpIcon = PIXI.Sprite.from('assets/help.png');
+    helpIcon.width = uiFontSize * 1.5;
+    helpIcon.height = uiFontSize * 1.5;
+    helpIcon.anchor.set(1, 1); // Bottom-right anchor
+    helpIcon.position.set(gameWidth - padding, gameHeight - padding);
+    helpIcon.eventMode = 'static';
+    helpIcon.cursor = 'pointer';
+    helpIcon.on('pointerdown', showHelpPopup);
+    homeContainer.addChild(helpIcon);
+}
+
+function createButton(label, x, y, onClick) {
+    const button = new PIXI.Container();
+    button.eventMode = 'static';
+    button.cursor = 'pointer';
+
+    const count = (label.match(/\n/g) || []).length;
+    bHeight = buttonHeight + count * 20;
+
+    const bg = new PIXI.Graphics();
+    bg.beginFill(0x4CAF50);
+    bg.drawRoundedRect(-buttonWidth / 2, -bHeight / 2, buttonWidth, bHeight, 30);
+    bg.endFill();
+    button.addChild(bg);
+
+    const text = new PIXI.Text(label, { 
+        fontFamily: 'Noto Sans Bengali, Arial', 
+        fill: 'white', 
+        align: 'center',
+        fontSize: btnfontsize,
+    });
+    text.anchor.set(0.5);
+    button.addChild(text);
+
+    button.x = x;
+    button.y = y;
+
+    button.on('pointerdown', onClick);
+    button.on('pointerover', () => bg.tint = 0x45a049); // Darker green on hover
+    button.on('pointerout', () => bg.tint = 0xffffff);  // Reset tint
+
+    return button;
+}
+
+function createPopup(content) {    
+    // Create new popup container
+    let popupContainer = new PIXI.Container();
+    
+    // Semi-transparent background
+    const bg = new PIXI.Graphics();
+    bg.beginFill(0x000000, 0.7);
+    bg.drawRect(0, 0, gameWidth, gameHeight);
+    bg.endFill();
+    popupContainer.addChild(bg);
+    
+    // Popup panel
+    const panel = new PIXI.Graphics();
+    panel.beginFill(0x333333);
+    panel.drawRect(gameWidth / 2 - content.width / 2 - popupPadding, gameHeight / 2 - content.height / 2 - popupPadding, content.width + popupPadding * 2, content.height + popupPadding * 2);
+    panel.endFill();
+    content.position.set(gameWidth / 2 - content.width / 2, gameHeight / 2 - content.height / 2);
+    panel.addChild(content);
+    popupContainer.addChild(panel);
+
+    return popupContainer;
 }
 
 function setupUiScene() {
     uiContainer = new PIXI.Container();
     gameArea.addChild(uiContainer);
-    uiContainer.visible = true; //for debugging only.
+    uiContainer.visible = false; //for debugging only.
+
+    // Load and add timer icon
+    const timerIcon = PIXI.Sprite.from('assets/stopwatch.png');
+    timerIcon.width = uiFontSize; // Use uiFontSize for icon sizing
+    timerIcon.height = uiFontSize;
+    timerIcon.position.set(padding, padding);
+    uiContainer.addChild(timerIcon);
 
     timerText = new PIXI.Text('Timer : 60', {
         fontFamily: 'Noto Sans Bengali, Arial',
-        fontSize: fontSize,
+        fontSize: uiFontSize, // Use uiFontSize for text
         fill: 0xffffff
     });
-    timerText.position.set(padding, padding);
+    timerText.position.set(padding + uiFontSize + 10, padding); // Position text to the right of icon with spacing
     uiContainer.addChild(timerText);
 
     levelText = new PIXI.Text('Level : 1', {
         fontFamily: 'Noto Sans Bengali, Arial',
-        fontSize: fontSize,
+        fontSize: uiFontSize, // Use uiFontSize for text
         fill: 0xffffff
     });
     levelText.anchor.set(1, 0);
     levelText.position.set(gameWidth - padding, padding);
     uiContainer.addChild(levelText);
+
+    // Load and add level icon
+    const levelIcon = PIXI.Sprite.from('assets/level.png');
+    levelIcon.width = uiFontSize; // Use uiFontSize for icon sizing
+    levelIcon.height = uiFontSize;
+    levelIcon.anchor.set(1, 0); // Right-align the icon like the text
+    levelIcon.position.set(gameWidth - padding - uiFontSize * 4.5, padding); // Position icon to the left of text with spacing
+    uiContainer.addChild(levelIcon);
 
     playPauseButton = createButton('Play/Pause', gameWidth / 2, gameHeight * 0.90, togglePause);
     uiContainer.addChild(playPauseButton);
@@ -160,7 +248,7 @@ function setupUiScene() {
 function setupMainScene() {
     mainContainer = new PIXI.Container();
     gameArea.addChild(mainContainer);
-    mainContainer.visible = true; // for debugging only.
+    mainContainer.visible = false; // for debugging only.
 
     loadLevel(currentLevel);
 }
@@ -289,13 +377,13 @@ async function loadLevel(levelIndex) {
 async function showLoadingScreen() {
     loadingScreen = new PIXI.Container();
     const bg = new PIXI.Graphics();
-    bg.beginFill(0x000000, 0.7);
+    bg.beginFill(0x224444, 0.7);
     bg.drawRect(0, 0, gameWidth, gameHeight);
     bg.endFill();
     loadingScreen.addChild(bg);
 
     // Load single PNG and rotate it programmatically
-    const spinnerTexture = await PIXI.Assets.load('assets/rotatingQ.png');
+    const spinnerTexture = await PIXI.Assets.load('assets/LoadingWheel.png');
     const spinner = new PIXI.Sprite(spinnerTexture);
     spinner.anchor.set(0.5);
     spinner.x = gameWidth / 2;
@@ -347,7 +435,7 @@ function showLevelUnavailablePopup(level, message) {
     failedMessage.anchor.set(0.5, 0);
     contentBox.addChild(failedMessage);
 
-    const retryLoading = createButton('Retry', 0, failedMessage.y + failedMessage.height + totalHeight * 0.30, retryLoadingLevel);
+    const retryLoading = createButton('Retry Loading', 0, failedMessage.y + failedMessage.height + totalHeight * 0.30, retryLoadingLevel);
     contentBox.addChild(retryLoading);
 
     totalWidth = Math.max(failedMessage.width, retryLoading.width);
@@ -517,28 +605,7 @@ function checkWin() {
     }
 }
 
-function createPopup(content) {    
-    // Create new popup container
-    let popupContainer = new PIXI.Container();
-    
-    // Semi-transparent background
-    const bg = new PIXI.Graphics();
-    bg.beginFill(0x000000, 0.7);
-    bg.drawRect(0, 0, gameWidth, gameHeight);
-    bg.endFill();
-    popupContainer.addChild(bg);
-    
-    // Popup panel
-    const panel = new PIXI.Graphics();
-    panel.beginFill(0x333333);
-    panel.drawRect(gameWidth / 2 - content.width / 2 - popupPadding, gameHeight / 2 - content.height / 2 - popupPadding, content.width + popupPadding * 2, content.height + popupPadding * 2);
-    panel.endFill();
-    content.position.set(gameWidth / 2 - content.width / 2, gameHeight / 2 - content.height / 2);
-    panel.addChild(content);
-    popupContainer.addChild(panel);
 
-    return popupContainer;
-}
 
 function showWinPopup() {
     console.log('Congrats');
@@ -609,16 +676,22 @@ function showWinPopup() {
     nextLevelButton = createButton('পৰৱৰ্তী স্তৰ\n(Next Level)', 0, starContainer.y + starContainer.height + totalHeight * 0.40, levelUp);
     contentBox.addChild(nextLevelButton);
     
+    // Add End Game button
+    const endButton = createButton('End Game', 0, nextLevelButton.y + nextLevelButton.height + 40, endGame);
+    contentBox.addChild(endButton);
+    
     // Calculate the maximum width needed
     totalWidth = Math.max(
         congratMessageAssamese.width,
         nextLevelButton.width,
+        endButton.width,
         starContainer.width
     );
 
     // Position elements horizontally in the center of totalWidth
     congratMessageAssamese.x = totalWidth / 2;
     nextLevelButton.x = totalWidth / 2;
+    endButton.x = totalWidth / 2;
     starContainer.x = totalWidth / 2 - starContainer.width / 2;
 
     winPopup = createPopup(contentBox);
@@ -631,46 +704,23 @@ function levelUp() {
     loadLevel(currentLevel);
 }
 
-function createButton(label, x, y, onClick) {
-    const button = new PIXI.Container();
-    button.eventMode = 'static';
-    button.cursor = 'pointer';
 
-    const count = (label.match(/\n/g) || []).length;
-    bHeight = buttonHeight + count * 20;
-
-    const bg = new PIXI.Graphics();
-    bg.beginFill(0x4CAF50);
-    bg.drawRoundedRect(-buttonWidth / 2, -bHeight / 2, buttonWidth, bHeight, 30);
-    bg.endFill();
-    button.addChild(bg);
-
-    const text = new PIXI.Text(label, { 
-        fontFamily: 'Noto Sans Bengali, Arial', 
-        fill: 'white', 
-        align: 'center',
-        fontSize: btnfontsize,
-    });
-    text.anchor.set(0.5);
-    button.addChild(text);
-
-    button.x = x;
-    button.y = y;
-
-    button.on('pointerdown', onClick);
-    button.on('pointerover', () => bg.tint = 0x45a049); // Darker green on hover
-    button.on('pointerout', () => bg.tint = 0xffffff);  // Reset tint
-
-    return button;
-}
 
 function startGame() {
-    console.log('Starting game');
-    //place holder for other codes.
+    homeContainer.visible = false;
+    mainContainer.visible = true;
+    uiContainer.visible = true;
+    
+    // Reset debugging variables to production values
+    timerRunning = true;
+    isPaused = false;
+    
+    loadLevel(currentLevel);
 }
 
 let pausePopup = null;
 let howToPlayPopup = null;
+let helpPopup = null;
 
 function togglePause() {
     // Close How to Play popup if open
@@ -695,13 +745,7 @@ function togglePause() {
         });
         contentBox.addChild(resumeButton);
         // End Game button
-        const endButton = createButton('End Game', 0, pauseLabel.height + resumeButton.height + 90, () => {
-            isPaused = false;
-            if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
-            mainContainer.visible = false;
-            uiContainer.visible = false;
-            homeContainer.visible = true;
-        });
+        const endButton = createButton('End Game', 0, pauseLabel.height + resumeButton.height + 90, endGame);
         contentBox.addChild(endButton);
         // How to Play button
         const howToPlayButton = createButton('How to Play', 0, pauseLabel.height + resumeButton.height + endButton.height + 120, () => {
@@ -758,7 +802,82 @@ function showHowToPlayPopup() {
     instructions.x = maxWidth / 2;
     closeButton.x = maxWidth / 2;
     howToPlayPopup = createPopup(contentBox);
-    mainContainer.addChild(howToPlayPopup);
+    
+    // Add to homeContainer if we're on home screen, otherwise to mainContainer
+    if (homeContainer.visible) {
+        homeContainer.addChild(howToPlayPopup);
+    } else {
+        mainContainer.addChild(howToPlayPopup);
+    }
+}
+
+function showHelpPopup() {
+    if (helpPopup) {
+        if (helpPopup.parent) {
+            helpPopup.parent.removeChild(helpPopup);
+        }
+        helpPopup.destroy({ children: true });
+        helpPopup = null;
+    }
+
+    const contentBox = new PIXI.Container();
+
+    const title = new PIXI.Text('Help & Support', {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: 32,
+        fill: 0xffffff
+    });
+    title.anchor.set(0.5);
+    title.position.set(0, -80);
+    contentBox.addChild(title);
+
+    const faqButton = createButton('FAQ', 0, -20, () => {
+        // TODO: Implement FAQ functionality
+        console.log('FAQ clicked');
+    });
+    contentBox.addChild(faqButton);
+
+    const contactButton = createButton('Contact Support', 0, 60, () => {
+        // TODO: Implement contact support functionality
+        console.log('Contact Support clicked');
+    });
+    contentBox.addChild(contactButton);
+
+    helpPopup = createPopup(contentBox);
+    
+    // Add to homeContainer if we're on home screen, otherwise to mainContainer
+    if (homeContainer.visible) {
+        homeContainer.addChild(helpPopup);
+    } else {
+        mainContainer.addChild(helpPopup);
+    }
+}
+
+function endGame() {
+    isPaused = false;
+    timerRunning = false;
+    currentLevel = 0;
+    
+    // Hide game containers
+    mainContainer.visible = false;
+    uiContainer.visible = false;
+    
+    // Show home container
+    homeContainer.visible = true;
+    
+    // Remove any open popups
+    if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+    if (losePopup && losePopup.parent) losePopup.parent.removeChild(losePopup);
+    if (winPopup && winPopup.parent) winPopup.parent.removeChild(winPopup);
+    if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
+    if (helpPopup && helpPopup.parent) helpPopup.parent.removeChild(helpPopup);
+    
+    // Reset popup references
+    pausePopup = null;
+    losePopup = null;
+    winPopup = null;
+    howToPlayPopup = null;
+    helpPopup = null;
 }
 
 app.ticker.add(() => {
@@ -828,19 +947,14 @@ function showLosePopup() {
         loadLevel(currentLevel);
     });
     contentBox.addChild(retryButton);
-    // Home button
-    const homeButton = createButton('Home', 0, retryButton.y + retryButton.height + 20, () => {
-        if (losePopup && losePopup.parent) losePopup.parent.removeChild(losePopup);
-        mainContainer.visible = false;
-        uiContainer.visible = false;
-        homeContainer.visible = true;
-    });
-    contentBox.addChild(homeButton);
+    // End button
+    const endButton = createButton('End Game', 0, retryButton.y + retryButton.height + 40, endGame);
+    contentBox.addChild(endButton);
     // Center buttons
-    let maxWidth = Math.max(loseMessage.width, retryButton.width, homeButton.width);
+    let maxWidth = Math.max(loseMessage.width, retryButton.width, endButton.width);
     loseMessage.x = maxWidth / 2;
     retryButton.x = maxWidth / 2;
-    homeButton.x = maxWidth / 2;
+    endButton.x = maxWidth / 2;
     // Center word label and word text if present
     if (correctWord) {
         contentBox.children[1].x = maxWidth / 2;
