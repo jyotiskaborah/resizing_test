@@ -56,6 +56,27 @@ scrollSound.volume = 0.5; // Quieter for repeated scrolling
 winSound.volume = 0.8;   // Louder for one-time win
 loseSound.volume = 0.8;  // Louder for one-time lose
 
+// Sound state
+let isMuted = false;
+let speakerButton = null;
+
+// Function to toggle sound mute
+function toggleSound() {
+    isMuted = !isMuted;
+    
+    // Update all audio volumes
+    const volume = isMuted ? 0 : 0.5;
+    scrollSound.volume = volume;
+    winSound.volume = isMuted ? 0 : 0.8;
+    loseSound.volume = isMuted ? 0 : 0.8;
+    
+    // Update speaker button icon
+    if (speakerButton) {
+        const iconPath = isMuted ? 'assets/mute.png' : 'assets/speaker.png';
+        speakerButton.texture = PIXI.Texture.from(iconPath);
+    }
+}
+
 
 const gameBox = new PIXI.Graphics();
 gameBox.beginFill(0x224444, 0.80);
@@ -144,6 +165,22 @@ function setupHomeScene() {
     helpIcon.cursor = 'pointer';
     helpIcon.on('pointerdown', showHelpPopup);
     homeContainer.addChild(helpIcon);
+
+    // Add speaker button at left bottom corner
+    const homeSpeakerButton = PIXI.Sprite.from('assets/speaker.png');
+    homeSpeakerButton.width = uiFontSize * 1.5;
+    homeSpeakerButton.height = uiFontSize * 1.5;
+    homeSpeakerButton.anchor.set(0, 1); // Bottom-left anchor
+    homeSpeakerButton.position.set(padding, gameHeight - padding);
+    homeSpeakerButton.eventMode = 'static';
+    homeSpeakerButton.cursor = 'pointer';
+    homeSpeakerButton.on('pointerdown', () => {
+        toggleSound();
+        // Update home screen speaker button too
+        const iconPath = isMuted ? 'assets/mute.png' : 'assets/speaker.png';
+        homeSpeakerButton.texture = PIXI.Texture.from(iconPath);
+    });
+    homeContainer.addChild(homeSpeakerButton);
 }
 
 function createButton(label, x, y, onClick) {
@@ -242,6 +279,17 @@ function setupUiScene() {
     playPauseButton = createButton('Play/Pause', gameWidth / 2, gameHeight * 0.90, togglePause);
     uiContainer.addChild(playPauseButton);
 
+    // Add speaker button to bottom left corner of uiContainer
+    speakerButton = PIXI.Sprite.from('assets/speaker.png');
+    speakerButton.width = uiFontSize * 1.5;
+    speakerButton.height = uiFontSize * 1.5;
+    speakerButton.anchor.set(0, 1); // Bottom-left anchor
+    speakerButton.position.set(padding, gameHeight - padding);
+    speakerButton.eventMode = 'static';
+    speakerButton.cursor = 'pointer';
+    speakerButton.on('pointerdown', toggleSound);
+    uiContainer.addChild(speakerButton);
+
   
 }
 
@@ -258,6 +306,12 @@ async function loadLevel(levelIndex) {
     mainContainer.removeChildren();
     stacks = [];
     selectedIndices = [];
+
+    // Update speaker button icon to match current mute state
+    if (speakerButton) {
+        const iconPath = isMuted ? 'assets/mute.png' : 'assets/speaker.png';
+        speakerButton.texture = PIXI.Texture.from(iconPath);
+    }
 
     // Show loading screen
     isLoading = true;
@@ -715,6 +769,12 @@ function startGame() {
     timerRunning = true;
     isPaused = false;
     
+    // Update speaker button icon to match current mute state
+    if (speakerButton) {
+        const iconPath = isMuted ? 'assets/mute.png' : 'assets/speaker.png';
+        speakerButton.texture = PIXI.Texture.from(iconPath);
+    }
+    
     loadLevel(currentLevel);
 }
 
@@ -843,6 +903,21 @@ function showHelpPopup() {
     });
     contentBox.addChild(contactButton);
 
+    // Add close button
+    const closeButton = createButton('Close', 0, 140, () => {
+        if (helpPopup && helpPopup.parent) {
+            helpPopup.parent.removeChild(helpPopup);
+        }
+    });
+    contentBox.addChild(closeButton);
+
+    // Center all buttons horizontally
+    let maxWidth = Math.max(title.width, faqButton.width, contactButton.width, closeButton.width);
+    title.x = maxWidth / 2;
+    faqButton.x = maxWidth / 2;
+    contactButton.x = maxWidth / 2;
+    closeButton.x = maxWidth / 2;
+
     helpPopup = createPopup(contentBox);
     
     // Add to homeContainer if we're on home screen, otherwise to mainContainer
@@ -878,6 +953,16 @@ function endGame() {
     winPopup = null;
     howToPlayPopup = null;
     helpPopup = null;
+    
+    // Update home screen speaker button to match current mute state
+    const homeSpeakerButton = homeContainer.children.find(child => 
+        child.texture && (child.texture.baseTexture.resource?.url?.includes('speaker.png') || 
+                         child.texture.baseTexture.resource?.url?.includes('mute.png'))
+    );
+    if (homeSpeakerButton) {
+        const iconPath = isMuted ? 'assets/mute.png' : 'assets/speaker.png';
+        homeSpeakerButton.texture = PIXI.Texture.from(iconPath);
+    }
 }
 
 app.ticker.add(() => {
