@@ -37,7 +37,7 @@ const popupPadding = 60;
 const fontSize = 25;
 const uiFontSize = 30; // UI element font size
 const btnfontsize = 30;
-const stackFontsize = 30;
+const stackFontsize = 40;
 const rowHeight = 100;
 const stackWidth = 100;
 const boxWidth = 100;
@@ -46,7 +46,7 @@ const buttonWidth = 360;
 const buttonHeight = 80;
 
 //------------------------     Container and button state     ------------------------
-let mainContainer, homeContainer, uiContainer, playPauseButton, timerText, levelText, loadingScreen;
+let mainContainer, homeContainer, uiContainer, playPauseButton, timerText, levelText, loadingScreen, popupTray;
 
 // Sound Effects using HTML5 Audio
 const scrollSound = new Audio('assets/scroll.mp3');
@@ -125,14 +125,70 @@ function initializeGame() {
     console.log('Initializing game');
     setupHomeScene();
     setupUiScene();
-    setupMainScene();
+    setupPopupTray();
+}
 
+function setupPopupTray() {
+    popupTray = new PIXI.Container();
+    gameArea.addChild(popupTray);
+    ensurePopupTrayOnTop();
+}
+
+// Helper functions to manage popup stack
+function showPopup(popup, parentPopup = null) {
+    // Hide parent popup if exists
+    if (parentPopup) {
+        parentPopup.visible = false;
+    }
+    
+    // Add to popup stack
+    popupStack.push({ popup, parentPopup });
+    
+    // Show the new popup
+    popup.visible = true;
+    
+    // Ensure popupTray stays on top
+    ensurePopupTrayOnTop();
+}
+
+function hidePopup(popup) {
+    // Find and remove from popup stack
+    const index = popupStack.findIndex(item => item.popup === popup);
+    if (index !== -1) {
+        const stackItem = popupStack[index];
+        popupStack.splice(index, 1);
+        
+        // Hide current popup
+        popup.visible = false;
+        
+        // Show parent popup if exists
+        if (stackItem.parentPopup) {
+            stackItem.parentPopup.visible = true;
+        }
+    }
+}
+
+function hideAllPopups() {
+    // Hide all popups and clear stack
+    popupStack.forEach(item => {
+        item.popup.visible = false;
+    });
+    popupStack = [];
+}
+
+// Helper function to ensure popupTray is always rendered on top within gameArea
+function ensurePopupTrayOnTop() {
+    if (popupTray && popupTray.parent === gameArea) {
+        gameArea.setChildIndex(popupTray, gameArea.children.length - 1);
+    }
 }
 
 function setupHomeScene() {
     homeContainer = new PIXI.Container();
     gameArea.addChild(homeContainer);
     homeContainer.visible = true; //remove in production.
+    // Ensure popupTray stays on top
+    ensurePopupTrayOnTop();
 
     const bg = new PIXI.Graphics();
     bg.beginFill(0xcccc99);
@@ -220,11 +276,12 @@ function createPopup(content) {
     // Create new popup container
     let popupContainer = new PIXI.Container();
     
-    // Semi-transparent background
+    // Semi-transparent background - make it fully interactive to block events
     const bg = new PIXI.Graphics();
     bg.beginFill(0x000000, 0.7);
     bg.drawRect(0, 0, gameWidth, gameHeight);
     bg.endFill();
+    bg.eventMode = 'static'; // Make background fully interactive to block events
     popupContainer.addChild(bg);
     
     // Popup panel
@@ -243,6 +300,8 @@ function setupUiScene() {
     uiContainer = new PIXI.Container();
     gameArea.addChild(uiContainer);
     uiContainer.visible = false; //for debugging only.
+    // Ensure popupTray stays on top
+    ensurePopupTrayOnTop();
 
     // Load and add timer icon
     const timerIcon = PIXI.Sprite.from('assets/stopwatch.png');
@@ -296,9 +355,8 @@ function setupUiScene() {
 function setupMainScene() {
     mainContainer = new PIXI.Container();
     gameArea.addChild(mainContainer);
-    mainContainer.visible = false; // for debugging only.
-
-    loadLevel(currentLevel);
+    // Ensure popupTray stays on top
+    ensurePopupTrayOnTop();
 }
 
 async function loadLevel(levelIndex) {
@@ -306,6 +364,9 @@ async function loadLevel(levelIndex) {
     mainContainer.removeChildren();
     stacks = [];
     selectedIndices = [];
+    
+    // Hide all popups when loading a new level
+    hideAllPopups();
 
     // Update speaker button icon to match current mute state
     if (speakerButton) {
@@ -497,12 +558,29 @@ function showLevelUnavailablePopup(level, message) {
     retryLoading.x = totalWidth / 2;
 
     const levelUnavailablePopup = createPopup(contentBox);  
-    mainContainer.addChild(levelUnavailablePopup);
+    popupTray.addChild(levelUnavailablePopup);
+    showPopup(levelUnavailablePopup);
 }
 
 function retryLoadingLevel() {
     console.log('Retrying Loading level');
-    //place holder for other codes.
+    // Hide the level unavailable popup by finding it in popupTray
+    const levelUnavailablePopup = popupTray.children.find(child => 
+        child.children && child.children.length > 0 && 
+        child.children[0].children && child.children[0].children.length > 0 &&
+        child.children[0].children[0].text && child.children[0].children[0].text.includes('Level') &&
+        child.children[0].children[0].text.includes('Unavailable')
+    );
+    if (levelUnavailablePopup) {
+        levelUnavailablePopup.visible = false;
+        // Remove from popup stack if it exists there
+        const stackIndex = popupStack.findIndex(item => item.popup === levelUnavailablePopup);
+        if (stackIndex !== -1) {
+            popupStack.splice(stackIndex, 1);
+        }
+    }
+    // Retry loading the level
+    loadLevel(currentLevel);
 }
 
 function setupHighlight() {
@@ -749,21 +827,27 @@ function showWinPopup() {
     starContainer.x = totalWidth / 2 - starContainer.width / 2;
 
     winPopup = createPopup(contentBox);
-    mainContainer.addChild(winPopup);
+    popupTray.addChild(winPopup);
+    showPopup(winPopup);
     winSound.play(); // Play win sound. 
 }
 
 function levelUp() {
     currentLevel++;
+    if (winPopup) hidePopup(winPopup);
     loadLevel(currentLevel);
 }
 
 
 
 function startGame() {
+    setupMainScene();
     homeContainer.visible = false;
     mainContainer.visible = true;
     uiContainer.visible = true;
+    
+    // Hide all popups when starting a new game
+    hideAllPopups();
     
     // Reset debugging variables to production values
     timerRunning = true;
@@ -781,151 +865,135 @@ function startGame() {
 let pausePopup = null;
 let howToPlayPopup = null;
 let helpPopup = null;
+let popupStack = []; // Stack to manage popup hierarchy
 
 function togglePause() {
-    // Close How to Play popup if open
-    if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
     isPaused = !isPaused;
     if (isPaused) {
         // Show pause menu
-        if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+        if (!pausePopup) {
+            const contentBox = new PIXI.Container();
+            const pauseLabel = new PIXI.Text('Paused', {
+                fontFamily: 'Noto Sans Bengali, Arial',
+                fontSize: fontSize * 2,
+                fill: 0xffffff,
+                align: 'center'
+            });
+            pauseLabel.anchor.set(0.5, 0);
+            contentBox.addChild(pauseLabel);
+            // Resume button
+            const resumeButton = createButton('Resume', 0, pauseLabel.height + 60, () => {
+                isPaused = false;
+                hidePopup(pausePopup);
+            });
+            contentBox.addChild(resumeButton);
+            // How to Play button
+            const howToPlayButton = createButton('How to Play', 0, pauseLabel.height + resumeButton.height + 90, () => {
+                showHowToPlayPopup(pausePopup);
+            });
+            contentBox.addChild(howToPlayButton);
+            // End Game button
+            const endButton = createButton('End Game', 0, pauseLabel.height + resumeButton.height + howToPlayButton.height + 120, endGame);
+            contentBox.addChild(endButton);
+            // Center all
+            let maxWidth = Math.max(pauseLabel.width, resumeButton.width, endButton.width, howToPlayButton.width);
+            pauseLabel.x = maxWidth / 2;
+            resumeButton.x = maxWidth / 2;
+            endButton.x = maxWidth / 2;
+            howToPlayButton.x = maxWidth / 2;
+            pausePopup = createPopup(contentBox);
+            popupTray.addChild(pausePopup);
+        }
+        showPopup(pausePopup);
+    } else {
+        // Hide pause menu if unpausing
+        hidePopup(pausePopup);
+    }
+}
+
+function showHowToPlayPopup(parentPopup = null) {
+    if (!howToPlayPopup) {
         const contentBox = new PIXI.Container();
-        const pauseLabel = new PIXI.Text('Paused', {
+        const title = new PIXI.Text('খেলৰ নিয়ম', {
             fontFamily: 'Noto Sans Bengali, Arial',
             fontSize: fontSize * 2,
             fill: 0xffffff,
             align: 'center'
         });
-        pauseLabel.anchor.set(0.5, 0);
-        contentBox.addChild(pauseLabel);
-        // Resume button
-        const resumeButton = createButton('Resume', 0, pauseLabel.height + 60, () => {
-            isPaused = false;
-            if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+        title.anchor.set(0.5, 0);
+        contentBox.addChild(title);
+        const instructions = new PIXI.Text(
+            'সঠিক শব্দটো গঠন কৰিবলৈ স্তম্ভসমূহ সজাওক।\n\n• স্তম্ভসমূহ ওপৰলৈ বা তললৈ টানি স্থানান্তৰ কৰক।\n• সময়-সীমা শেষ হোৱাৰ আগতে সম্পূৰ্ণ কৰক।\n• সোনকালে শেষ কৰিলে অধিক ষ্টাৰ পাব!',
+            {
+                fontFamily: 'Noto Sans Bengali, Arial',
+                fontSize: fontSize * 1.2,
+                fill: 0xffff4d,
+                align: 'left',
+                wordWrap: true,
+                wordWrapWidth: 400
+            }
+        );
+        instructions.anchor.set(0.5, 0);
+        instructions.y = title.height + 20;
+        contentBox.addChild(instructions);
+        // Close button
+        const closeButton = createButton('Close', 0, instructions.y + instructions.height + 60, () => {
+            hidePopup(howToPlayPopup);
         });
-        contentBox.addChild(resumeButton);
-        // End Game button
-        const endButton = createButton('End Game', 0, pauseLabel.height + resumeButton.height + 90, endGame);
-        contentBox.addChild(endButton);
-        // How to Play button
-        const howToPlayButton = createButton('How to Play', 0, pauseLabel.height + resumeButton.height + endButton.height + 120, () => {
-            showHowToPlayPopup();
-        });
-        contentBox.addChild(howToPlayButton);
+        contentBox.addChild(closeButton);
         // Center all
-        let maxWidth = Math.max(pauseLabel.width, resumeButton.width, endButton.width, howToPlayButton.width);
-        pauseLabel.x = maxWidth / 2;
-        resumeButton.x = maxWidth / 2;
-        endButton.x = maxWidth / 2;
-        howToPlayButton.x = maxWidth / 2;
-        pausePopup = createPopup(contentBox);
-        mainContainer.addChild(pausePopup);
-    } else {
-        // Hide pause menu if unpausing
-        if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
+        let maxWidth = Math.max(title.width, instructions.width, closeButton.width);
+        title.x = maxWidth / 2;
+        instructions.x = maxWidth / 2;
+        closeButton.x = maxWidth / 2;
+        howToPlayPopup = createPopup(contentBox);
+        popupTray.addChild(howToPlayPopup);
     }
-}
-
-function showHowToPlayPopup() {
-    if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
-    const contentBox = new PIXI.Container();
-    const title = new PIXI.Text('খেলৰ নিয়ম', {
-        fontFamily: 'Noto Sans Bengali, Arial',
-        fontSize: fontSize * 2,
-        fill: 0xffffff,
-        align: 'center'
-    });
-    title.anchor.set(0.5, 0);
-    contentBox.addChild(title);
-    const instructions = new PIXI.Text(
-        'সঠিক শব্দটো গঠন কৰিবলৈ স্তম্ভসমূহ সজাওক।\n\n• স্তম্ভসমূহ ওপৰলৈ বা তললৈ টানি স্থানান্তৰ কৰক।\n• সময়-সীমা শেষ হোৱাৰ আগতে সম্পূৰ্ণ কৰক।\n• সোনকালে শেষ কৰিলে অধিক ষ্টাৰ পাব!',
-        {
-            fontFamily: 'Noto Sans Bengali, Arial',
-            fontSize: fontSize * 1.2,
-            fill: 0xffff4d,
-            align: 'left',
-            wordWrap: true,
-            wordWrapWidth: 400
-        }
-    );
-    instructions.anchor.set(0.5, 0);
-    instructions.y = title.height + 20;
-    contentBox.addChild(instructions);
-    // Close button
-    const closeButton = createButton('Close', 0, instructions.y + instructions.height + 60, () => {
-        if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
-    });
-    contentBox.addChild(closeButton);
-    // Center all
-    let maxWidth = Math.max(title.width, instructions.width, closeButton.width);
-    title.x = maxWidth / 2;
-    instructions.x = maxWidth / 2;
-    closeButton.x = maxWidth / 2;
-    howToPlayPopup = createPopup(contentBox);
-    
-    // Add to homeContainer if we're on home screen, otherwise to mainContainer
-    if (homeContainer.visible) {
-        homeContainer.addChild(howToPlayPopup);
-    } else {
-        mainContainer.addChild(howToPlayPopup);
-    }
+    showPopup(howToPlayPopup, parentPopup);
 }
 
 function showHelpPopup() {
-    if (helpPopup) {
-        if (helpPopup.parent) {
-            helpPopup.parent.removeChild(helpPopup);
-        }
-        helpPopup.destroy({ children: true });
-        helpPopup = null;
+    if (!helpPopup) {
+        const contentBox = new PIXI.Container();
+
+        const title = new PIXI.Text('Help & Support', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: 32,
+            fill: 0xffffff,
+            align: 'center'
+        });
+        title.anchor.set(0.5,0);
+        contentBox.addChild(title);
+
+        const faqButton = createButton('FAQ', 0, title.height + 60, () => {
+            // TODO: Implement FAQ functionality
+            console.log('FAQ clicked');
+        });
+        contentBox.addChild(faqButton);
+
+        const contactButton = createButton('Contact Support', 0, title.height + faqButton.height + 90, () => {
+            // TODO: Implement contact support functionality
+            console.log('Contact Support clicked');
+        });
+        contentBox.addChild(contactButton);
+
+        // Add close button
+        const closeButton = createButton('Close', 0, title.height + faqButton.height + contactButton.height + 120, () => {
+            hidePopup(helpPopup);
+        });
+        contentBox.addChild(closeButton);
+
+        // Center all buttons horizontally
+        let maxWidth = Math.max(title.width, faqButton.width, contactButton.width, closeButton.width);
+        title.x = maxWidth / 2;
+        faqButton.x = maxWidth / 2;
+        contactButton.x = maxWidth / 2;
+        closeButton.x = maxWidth / 2;
+
+        helpPopup = createPopup(contentBox);
+        popupTray.addChild(helpPopup);
     }
-
-    const contentBox = new PIXI.Container();
-
-    const title = new PIXI.Text('Help & Support', {
-        fontFamily: 'Noto Sans Bengali, Arial',
-        fontSize: 32,
-        fill: 0xffffff
-    });
-    title.anchor.set(0.5);
-    title.position.set(0, -80);
-    contentBox.addChild(title);
-
-    const faqButton = createButton('FAQ', 0, -20, () => {
-        // TODO: Implement FAQ functionality
-        console.log('FAQ clicked');
-    });
-    contentBox.addChild(faqButton);
-
-    const contactButton = createButton('Contact Support', 0, 60, () => {
-        // TODO: Implement contact support functionality
-        console.log('Contact Support clicked');
-    });
-    contentBox.addChild(contactButton);
-
-    // Add close button
-    const closeButton = createButton('Close', 0, 140, () => {
-        if (helpPopup && helpPopup.parent) {
-            helpPopup.parent.removeChild(helpPopup);
-        }
-    });
-    contentBox.addChild(closeButton);
-
-    // Center all buttons horizontally
-    let maxWidth = Math.max(title.width, faqButton.width, contactButton.width, closeButton.width);
-    title.x = maxWidth / 2;
-    faqButton.x = maxWidth / 2;
-    contactButton.x = maxWidth / 2;
-    closeButton.x = maxWidth / 2;
-
-    helpPopup = createPopup(contentBox);
-    
-    // Add to homeContainer if we're on home screen, otherwise to mainContainer
-    if (homeContainer.visible) {
-        homeContainer.addChild(helpPopup);
-    } else {
-        mainContainer.addChild(helpPopup);
-    }
+    showPopup(helpPopup);
 }
 
 function endGame() {
@@ -940,19 +1008,8 @@ function endGame() {
     // Show home container
     homeContainer.visible = true;
     
-    // Remove any open popups
-    if (pausePopup && pausePopup.parent) pausePopup.parent.removeChild(pausePopup);
-    if (losePopup && losePopup.parent) losePopup.parent.removeChild(losePopup);
-    if (winPopup && winPopup.parent) winPopup.parent.removeChild(winPopup);
-    if (howToPlayPopup && howToPlayPopup.parent) howToPlayPopup.parent.removeChild(howToPlayPopup);
-    if (helpPopup && helpPopup.parent) helpPopup.parent.removeChild(helpPopup);
-    
-    // Reset popup references
-    pausePopup = null;
-    losePopup = null;
-    winPopup = null;
-    howToPlayPopup = null;
-    helpPopup = null;
+    // Hide all open popups using visibility
+    hideAllPopups();
     
     // Update home screen speaker button to match current mute state
     const homeSpeakerButton = homeContainer.children.find(child => 
@@ -991,12 +1048,9 @@ app.ticker.add(() => {
 let losePopup = null;
 
 function showLosePopup() {
-    // Remove any existing lose popup
-    if (losePopup && losePopup.parent) {
-        losePopup.parent.removeChild(losePopup);
-    }
-    // Content for lose popup
-    const contentBox = new PIXI.Container();
+    if (!losePopup) {
+        // Content for lose popup
+        const contentBox = new PIXI.Container();
     const loseMessage = new PIXI.Text('আপুনি হাৰি গ’ল!', {
         fontFamily: 'Noto Sans Bengali, Arial',
         fontSize: fontSize * 2,
@@ -1028,7 +1082,7 @@ function showLosePopup() {
     }
     // Retry button
     const retryButton = createButton('Retry', 0, loseMessage.y + loseMessage.height + 180, () => {
-        if (losePopup && losePopup.parent) losePopup.parent.removeChild(losePopup);
+        hidePopup(losePopup);
         loadLevel(currentLevel);
     });
     contentBox.addChild(retryButton);
@@ -1047,7 +1101,9 @@ function showLosePopup() {
     }
     // Create and show popup
     losePopup = createPopup(contentBox);
-    mainContainer.addChild(losePopup);
+    popupTray.addChild(losePopup);
+    }
+    showPopup(losePopup);
     // Optionally play lose sound
     if (typeof loseSound !== 'undefined') loseSound.play();
 }
