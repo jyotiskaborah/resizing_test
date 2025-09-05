@@ -977,8 +977,13 @@ function showHelpPopup() {
         });
         contentBox.addChild(contactButton);
 
+        const aboutButton = createButton('About', 0, title.height + faqButton.height + contactButton.height + 120, () => {
+            showAboutPopup(helpPopup);
+        });
+        contentBox.addChild(aboutButton);        
+
         // Add close button
-        const closeButton = createButton('Close', 0, title.height + faqButton.height + contactButton.height + 120, () => {
+        const closeButton = createButton('Close', 0, title.height + faqButton.height + contactButton.height + aboutButton.height + 150, () => {
             hidePopup(helpPopup);
         });
         contentBox.addChild(closeButton);
@@ -989,11 +994,168 @@ function showHelpPopup() {
         faqButton.x = maxWidth / 2;
         contactButton.x = maxWidth / 2;
         closeButton.x = maxWidth / 2;
+        aboutButton.x = maxWidth / 2;
+        closeButton.x = maxWidth / 2;
 
         helpPopup = createPopup(contentBox);
         popupTray.addChild(helpPopup);
     }
     showPopup(helpPopup);
+}
+
+let aboutPopup = null;
+
+function showAboutPopup(parentPopup = null) {
+    if (!aboutPopup) {
+        const contentBox = new PIXI.Container();
+        
+        // Game Title
+        const gameTitle = new PIXI.Text('Xobdotola', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 2.5,
+            fill: 0x4CAF50,
+            align: 'center',
+            fontWeight: 'bold'
+        });
+        gameTitle.anchor.set(0.5, 0);
+        contentBox.addChild(gameTitle);
+
+        // Game Subtitle
+        const gameSubtitle = new PIXI.Text('Word Puzzle Game', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 1.2,
+            fill: 0xffffff,
+            align: 'center'
+        });
+        gameSubtitle.anchor.set(0.5, 0);
+        gameSubtitle.y = gameTitle.height + 10;
+        contentBox.addChild(gameSubtitle);
+
+        // Game Description
+        const gameDescription = new PIXI.Text(
+            'Xobdotola is an engaging word puzzle game where players arrange letter stacks to form correct words. Challenge your vocabulary and quick thinking skills as you race against time to solve each level.',
+            {
+                fontFamily: 'Noto Sans Bengali, Arial',
+                fontSize: fontSize * 0.9,
+                fill: 0xcccccc,
+                align: 'left',
+                wordWrap: true,
+                wordWrapWidth: 450
+            }
+        );
+        gameDescription.anchor.set(0.5, 0);
+        gameDescription.y = gameSubtitle.y + gameSubtitle.height + 20;
+        contentBox.addChild(gameDescription);
+
+        // Features Section
+        const featuresTitle = new PIXI.Text('Features:', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 1.1,
+            fill: 0xffff4d,
+            align: 'left'
+        });
+        featuresTitle.anchor.set(0.5, 0);
+        featuresTitle.y = gameDescription.y + gameDescription.height + 20;
+        contentBox.addChild(featuresTitle);
+
+        const featuresList = new PIXI.Text(
+            '• Multiple challenging levels\n• Time-based gameplay\n• Star rating system\n• Assamese language support\n• Intuitive drag-and-drop controls',
+            {
+                fontFamily: 'Noto Sans Bengali, Arial',
+                fontSize: fontSize * 0.85,
+                fill: 0xffffff,
+                align: 'left',
+                wordWrap: true,
+                wordWrapWidth: 400
+            }
+        );
+        featuresList.anchor.set(0.5, 0);
+        featuresList.y = featuresTitle.y + featuresTitle.height + 10;
+        contentBox.addChild(featuresList);
+
+        // Publisher Section
+        const publisherTitle = new PIXI.Text('Published by:', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 1.1,
+            fill: 0xffff4d,
+            align: 'center'
+        });
+        publisherTitle.anchor.set(0.5, 0);
+        publisherTitle.y = featuresList.y + featuresList.height + 20;
+        contentBox.addChild(publisherTitle);
+
+        const publisherName = new PIXI.Text('Jeuti.in', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 1.5,
+            fill: 0x4CAF50,
+            align: 'center',
+            fontWeight: 'bold'
+        });
+        publisherName.anchor.set(0.5, 0);
+        publisherName.y = publisherTitle.y + publisherTitle.height + 5;
+        contentBox.addChild(publisherName);
+
+        const publisherDescription = new PIXI.Text(
+            'Creating innovative and engaging games for Assamese language learners and puzzle enthusiasts.',
+            {
+                fontFamily: 'Noto Sans Bengali, Arial',
+                fontSize: fontSize * 0.8,
+                fill: 0xcccccc,
+                align: 'center',
+                wordWrap: true,
+                wordWrapWidth: 400
+            }
+        );
+        publisherDescription.anchor.set(0.5, 0);
+        publisherDescription.y = publisherName.y + publisherName.height + 10;
+        contentBox.addChild(publisherDescription);
+
+        // Version Info
+        const versionInfo = new PIXI.Text('Version 1.0.0', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 0.7,
+            fill: 0x888888,
+            align: 'center'
+        });
+        versionInfo.anchor.set(0.5, 0);
+        versionInfo.y = publisherDescription.y + publisherDescription.height + 15;
+        contentBox.addChild(versionInfo);
+
+        // Close button
+        const closeButton = createButton('Close', 0, versionInfo.y + versionInfo.height + 50, () => {
+            hidePopup(aboutPopup);
+        });
+        contentBox.addChild(closeButton);
+
+        // Center all elements horizontally
+        const maxWidth = Math.max(
+            gameTitle.width,
+            gameSubtitle.width,
+            gameDescription.width,
+            featuresTitle.width,
+            featuresList.width,
+            publisherTitle.width,
+            publisherName.width,
+            publisherDescription.width,
+            versionInfo.width,
+            closeButton.width
+        );
+
+        gameTitle.x = maxWidth / 2;
+        gameSubtitle.x = maxWidth / 2;
+        gameDescription.x = maxWidth / 2;
+        featuresTitle.x = maxWidth / 2;
+        featuresList.x = maxWidth / 2;
+        publisherTitle.x = maxWidth / 2;
+        publisherName.x = maxWidth / 2;
+        publisherDescription.x = maxWidth / 2;
+        versionInfo.x = maxWidth / 2;
+        closeButton.x = maxWidth / 2;
+
+        aboutPopup = createPopup(contentBox);
+        popupTray.addChild(aboutPopup);
+    }
+    showPopup(aboutPopup, parentPopup);
 }
 
 function endGame() {
@@ -1048,9 +1210,15 @@ app.ticker.add(() => {
 let losePopup = null;
 
 function showLosePopup() {
-    if (!losePopup) {
-        // Content for lose popup
-        const contentBox = new PIXI.Container();
+    // If there's an existing losePopup, remove and destroy it
+    if (losePopup) {
+        popupTray.removeChild(losePopup);
+        losePopup.destroy({children: true});
+        losePopup = null;
+    }
+
+    // Now create new
+    const contentBox = new PIXI.Container();
     const loseMessage = new PIXI.Text('আপুনি হাৰি গ’ল!', {
         fontFamily: 'Noto Sans Bengali, Arial',
         fontSize: fontSize * 2,
@@ -1102,7 +1270,6 @@ function showLosePopup() {
     // Create and show popup
     losePopup = createPopup(contentBox);
     popupTray.addChild(losePopup);
-    }
     showPopup(losePopup);
     // Optionally play lose sound
     if (typeof loseSound !== 'undefined') loseSound.play();
