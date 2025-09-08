@@ -16,6 +16,7 @@ const gameHeight = 1200;
 //------------------------    Game state    ------------------------
 const maxTime = 10;
 const totalStars = 3;
+const maxLives = 3;
 let currentLevel = 0;
 let selectedIndices = [];
 let correctPosition = [];
@@ -27,6 +28,10 @@ let lastTimerUpdate = Date.now();
 let levelStartTime = Date.now(); // <-- Add this declaration
 let isLoading = false;
 let correctWord = '';
+// Life system
+let remainingLives = maxLives;
+let lifeDisplayContainer = null;
+let totalStarsAchieved = 0;
 
 
 
@@ -52,9 +57,11 @@ let mainContainer, homeContainer, uiContainer, playPauseButton, timerText, level
 const scrollSound = new Audio('assets/scroll.mp3');
 const winSound = new Audio('assets/win.mp3');
 const loseSound = new Audio('assets/lose.mp3');
+const gameOverSound = new Audio('assets/gameover.mp3'); // Using lose sound for game over
 scrollSound.volume = 0.5; // Quieter for repeated scrolling
 winSound.volume = 0.8;   // Louder for one-time win
 loseSound.volume = 0.8;  // Louder for one-time lose
+gameOverSound.volume = 0.9; // Slightly louder for game over
 
 // Sound state
 let isMuted = false;
@@ -69,6 +76,7 @@ function toggleSound() {
     scrollSound.volume = volume;
     winSound.volume = isMuted ? 0 : 0.8;
     loseSound.volume = isMuted ? 0 : 0.8;
+    gameOverSound.volume = isMuted ? 0 : 0.9;
     
     // Update speaker button icon
     if (speakerButton) {
@@ -335,6 +343,9 @@ function setupUiScene() {
     levelIcon.position.set(gameWidth - padding - uiFontSize * 4.5, padding); // Position icon to the left of text with spacing
     uiContainer.addChild(levelIcon);
 
+    // Add life display in top middle
+    setupLifeDisplay();
+
     playPauseButton = createButton('Play/Pause', gameWidth / 2, gameHeight * 0.90, togglePause);
     uiContainer.addChild(playPauseButton);
 
@@ -350,6 +361,56 @@ function setupUiScene() {
     uiContainer.addChild(speakerButton);
 
   
+}
+
+function setupLifeDisplay() {
+    // Remove existing life display if it exists
+    if (lifeDisplayContainer) {
+        uiContainer.removeChild(lifeDisplayContainer);
+        lifeDisplayContainer.destroy({ children: true });
+    }
+
+    // Create new life display container
+    lifeDisplayContainer = new PIXI.Container();
+    uiContainer.addChild(lifeDisplayContainer);
+
+    const heartSize = uiFontSize * 0.8;
+    const heartSpacing = heartSize * 1.2;
+
+    // Position in top middle
+    const startX = gameWidth / 2 - (maxLives * heartSpacing) / 2;
+    const heartY = padding;
+
+    for (let i = 0; i < maxLives; i++) {
+        const heart = new PIXI.Text('❤️', {
+            fontSize: heartSize,
+            fill: 0xff0000
+        });
+        heart.anchor.set(0.5);
+        heart.x = startX + i * heartSpacing;
+        heart.y = heartY;
+        heart.name = `heart_${i}`;
+        lifeDisplayContainer.addChild(heart);
+    }
+
+    updateLifeDisplay();
+}
+
+function updateLifeDisplay() {
+    if (!lifeDisplayContainer) return;
+
+    for (let i = 0; i < maxLives; i++) {
+        const heart = lifeDisplayContainer.getChildByName(`heart_${i}`);
+        if (heart) {
+            if (i < remainingLives) {
+                heart.text = '❤️';
+                heart.style.fill = 0xff0000;
+            } else {
+                heart.text = '🖤';
+                heart.style.fill = 0x000000;
+            }
+        }
+    }
 }
 
 function setupMainScene() {
@@ -745,6 +806,9 @@ function showWinPopup() {
     // Calculate time taken and stars
     const timeTaken = Math.round((Date.now() - levelStartTime) / 1000);
     let stars = timeTaken <= 20 ? 3 : timeTaken <= 30 ? 2 : 1;
+    
+    // Add stars to total
+    totalStarsAchieved += stars;
 
     let totalWidth = 0;
     const totalHeight = 300;
@@ -802,7 +866,6 @@ function showWinPopup() {
         animationTimers.push(timerId);
     }
     starContainer.position.set(0, congratMessageAssamese.y + congratMessageAssamese.height + totalHeight * 0.20);
-    console.log('StarContainer.width =', starContainer.width);
     contentBox.addChild(starContainer);
 
     nextLevelButton = createButton('পৰৱৰ্তী স্তৰ\n(Next Level)', 0, starContainer.y + starContainer.height + totalHeight * 0.40, levelUp);
@@ -849,9 +912,15 @@ function startGame() {
     // Hide all popups when starting a new game
     hideAllPopups();
     
-    // Reset debugging variables to production values
+    // Reset game state
+    remainingLives = maxLives;
+    currentLevel = 0;
+    totalStarsAchieved = 0;
     timerRunning = true;
     isPaused = false;
+    
+    // Update life display
+    updateLifeDisplay();
     
     // Update speaker button icon to match current mute state
     if (speakerButton) {
@@ -1210,11 +1279,21 @@ app.ticker.add(() => {
 let losePopup = null;
 
 function showLosePopup() {
+    // Decrement lives
+    remainingLives--;
+    updateLifeDisplay();
+
     // If there's an existing losePopup, remove and destroy it
     if (losePopup) {
         popupTray.removeChild(losePopup);
         losePopup.destroy({children: true});
         losePopup = null;
+    }
+
+    // Check if game over
+    if (remainingLives <= 0) {
+        showGameOverPopup();
+        return;
     }
 
     // Now create new
@@ -1227,6 +1306,79 @@ function showLosePopup() {
     });
     loseMessage.anchor.set(0.5, 0);
     contentBox.addChild(loseMessage);
+
+    // Show animated heart transition - similar to star container
+    const heartContainer = new PIXI.Container();
+    heartContainer.y = loseMessage.height + 40;
+    contentBox.addChild(heartContainer);
+    
+    // Use same measurement system as stars
+    const heartFontSize = fontSize * 2;
+    const heartSpacing = heartFontSize * 1.5; // Same spacing calculation as stars
+    
+    // Keep track of animation timers to clear them if needed
+    const animationTimers = [];
+    
+    for (let i = 0; i < maxLives; i++) {
+        const heartChar = i < remainingLives ? '❤️' : '🖤';
+        const heart = new PIXI.Text(heartChar, {
+            fontSize: heartFontSize,
+            fill: i < remainingLives ? 0xff0000 : 0x000000 // Red for remaining, black for consumed
+        });
+        heart.x = i * heartSpacing;
+        heart.y = 0;
+        heart.scale.set(0); // Start invisible
+        heart.anchor.set(0.5);
+        heartContainer.addChild(heart);
+        
+        // Animate the heart that just got consumed
+        if (i === remainingLives) {
+            // Start with red heart and animate to black
+            heart.text = '❤️';
+            heart.style.fill = 0xff0000;
+            heart.scale.set(2); // Start at scale 2
+            
+            // Animate to black heart
+            const delay = 200; // 200ms delay
+            const duration = 800; // 800ms animation
+            const startScale = 2;
+            const endScale = 1;
+            const timerId = setTimeout(() => {
+                let startTime = null;
+                const animateFunction = (delta) => {
+                    if (!startTime) startTime = app.ticker.lastTime;
+                    const elapsed = app.ticker.lastTime - startTime;
+                    const t = Math.min(elapsed / duration, 1);
+                    const ease = 1 - Math.pow(1 - t, 2); // Ease-out quadratic
+                    heart.scale.set(startScale + (endScale - startScale) * ease);
+                    
+                    // Change to black heart when reaching end scale
+                    if (t >= 0.8) {
+                        heart.text = '🖤';
+                        heart.style.fill = 0x000000;
+                    }
+                    
+                    if (t === 1) {
+                        heart.scale.set(endScale);
+                        app.ticker.remove(animateFunction);
+                    }
+                };
+                heart._animateFunction = animateFunction; // Store reference to remove later if needed
+                app.ticker.add(animateFunction);
+            }, delay);
+            animationTimers.push(timerId);
+        } else if (i < remainingLives) {
+            // Remaining hearts - show immediately
+            heart.scale.set(1);
+        } else {
+            // Already consumed hearts - show immediately
+            heart.scale.set(1);
+        }
+    }
+    
+    // Center the heart container using same method as stars
+    heartContainer.x = 0; // Will be centered later with totalWidth calculation
+
     // Show correct word
     if (correctWord) {
         const wordLabel = new PIXI.Text('Correct Word:', {
@@ -1236,7 +1388,7 @@ function showLosePopup() {
             align: 'center'
         });
         wordLabel.anchor.set(0.5, 0);
-        wordLabel.y = loseMessage.height + 20;
+        wordLabel.y = heartContainer.y + heartContainer.height;
         contentBox.addChild(wordLabel);
         const wordText = new PIXI.Text(correctWord, {
             fontFamily: 'Noto Sans Bengali, Arial',
@@ -1248,24 +1400,31 @@ function showLosePopup() {
         wordText.y = wordLabel.y + wordLabel.height + 5;
         contentBox.addChild(wordText);
     }
+    
     // Retry button
-    const retryButton = createButton('Retry', 0, loseMessage.y + loseMessage.height + 180, () => {
+    const retryButton = createButton('Retry', 0, heartContainer.y + heartContainer.height + 200, () => {
         hidePopup(losePopup);
         loadLevel(currentLevel);
     });
     contentBox.addChild(retryButton);
+    
     // End button
     const endButton = createButton('End Game', 0, retryButton.y + retryButton.height + 40, endGame);
     contentBox.addChild(endButton);
-    // Center buttons
-    let maxWidth = Math.max(loseMessage.width, retryButton.width, endButton.width);
+    
+    // Center buttons using same method as stars
+    let maxWidth = Math.max(loseMessage.width, heartContainer.width, retryButton.width, endButton.width);
     loseMessage.x = maxWidth / 2;
+    heartContainer.x = maxWidth / 2 - heartContainer.width / 2 + heartFontSize; // Same centering as stars
     retryButton.x = maxWidth / 2;
     endButton.x = maxWidth / 2;
+    
     // Center word label and word text if present
     if (correctWord) {
-        contentBox.children[1].x = maxWidth / 2;
-        contentBox.children[2].x = maxWidth / 2;
+        const wordLabelIndex = contentBox.children.findIndex(child => child.text && child.text.includes('Correct Word'));
+        const wordTextIndex = wordLabelIndex + 1;
+        if (wordLabelIndex !== -1) contentBox.children[wordLabelIndex].x = maxWidth / 2;
+        if (wordTextIndex !== -1) contentBox.children[wordTextIndex].x = maxWidth / 2;
     }
     // Create and show popup
     losePopup = createPopup(contentBox);
@@ -1273,6 +1432,149 @@ function showLosePopup() {
     showPopup(losePopup);
     // Optionally play lose sound
     if (typeof loseSound !== 'undefined') loseSound.play();
+}
+
+let gameOverPopup = null;
+
+function showGameOverPopup() {
+    // If there's an existing gameOverPopup, remove and destroy it
+    if (gameOverPopup) {
+        popupTray.removeChild(gameOverPopup);
+        gameOverPopup.destroy({children: true});
+        gameOverPopup = null;
+    }
+
+    const contentBox = new PIXI.Container();
+    
+    // Game Over Title
+    const gameOverTitle = new PIXI.Text('Game Over!', {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize * 2.5,
+        fill: 0xff4444,
+        align: 'center',
+        fontWeight: 'bold'
+    });
+    gameOverTitle.anchor.set(0.5, 0);
+    contentBox.addChild(gameOverTitle);
+
+    // Level Won Info
+    const levelWonText = new PIXI.Text(`Level Won: ${currentLevel}`, {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize * 1.5,
+        fill: 0xffffff,
+        align: 'center'
+    });
+    levelWonText.anchor.set(0.5, 0);
+    levelWonText.y = gameOverTitle.height + 20;
+    contentBox.addChild(levelWonText);
+
+    // Lives exhausted message
+    const livesMessage = new PIXI.Text('All lives exhausted!', {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize * 1.2,
+        fill: 0xffff4d,
+        align: 'center'
+    });
+    livesMessage.anchor.set(0.5, 0);
+    livesMessage.y = levelWonText.y + levelWonText.height + 20;
+    contentBox.addChild(livesMessage);
+
+    // Total stars achieved
+    const starsMessage = new PIXI.Text(`Total Stars: ${totalStarsAchieved}`, {
+        fontFamily: 'Noto Sans Bengali, Arial',
+        fontSize: fontSize * 1.3,
+        fill: 0xffff00,
+        align: 'center'
+    });
+    starsMessage.anchor.set(0.5, 0);
+    starsMessage.y = livesMessage.y + livesMessage.height + 20;
+    contentBox.addChild(starsMessage);
+
+    // Show correct word if available
+    let correctWordY = starsMessage.y + starsMessage.height + 20;
+    if (correctWord) {
+        const wordLabel = new PIXI.Text('Correct Word:', {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize,
+            fill: 0xffffff,
+            align: 'center'
+        });
+        wordLabel.anchor.set(0.5, 0);
+        wordLabel.y = correctWordY;
+        contentBox.addChild(wordLabel);
+        
+        const wordText = new PIXI.Text(correctWord, {
+            fontFamily: 'Noto Sans Bengali, Arial',
+            fontSize: fontSize * 1.5,
+            fill: 0xffff00,
+            align: 'center'
+        });
+        wordText.anchor.set(0.5, 0);
+        wordText.y = wordLabel.y + wordLabel.height + 5;
+        contentBox.addChild(wordText);
+        
+        correctWordY = wordText.y + wordText.height + 20;
+    }
+
+    // Restart Game button
+    const restartButton = createButton('Restart Game', 0, correctWordY + 20, () => {
+        hidePopup(gameOverPopup);
+        restartGame();
+    });
+    contentBox.addChild(restartButton);
+
+    // End Game button
+    const endButton = createButton('End Game', 0, restartButton.y + restartButton.height + 40, endGame);
+    contentBox.addChild(endButton);
+
+    // Center all elements
+    let maxWidth = Math.max(gameOverTitle.width, levelWonText.width, livesMessage.width, starsMessage.width, restartButton.width, endButton.width);
+    gameOverTitle.x = maxWidth / 2;
+    levelWonText.x = maxWidth / 2;
+    livesMessage.x = maxWidth / 2;
+    starsMessage.x = maxWidth / 2;
+    restartButton.x = maxWidth / 2;
+    endButton.x = maxWidth / 2;
+    
+    // Center correct word elements if present
+    if (correctWord) {
+        const wordLabelIndex = contentBox.children.findIndex(child => child.text && child.text.includes('Correct Word'));
+        const wordTextIndex = wordLabelIndex + 1;
+        if (wordLabelIndex !== -1) contentBox.children[wordLabelIndex].x = maxWidth / 2;
+        if (wordTextIndex !== -1) contentBox.children[wordTextIndex].x = maxWidth / 2;
+    }
+
+    // Create and show popup
+    gameOverPopup = createPopup(contentBox);
+    popupTray.addChild(gameOverPopup);
+    showPopup(gameOverPopup);
+    
+    // Play game over sound
+    if (typeof gameOverSound !== 'undefined') gameOverSound.play();
+}
+
+function restartGame() {
+    // Reset game state
+    remainingLives = maxLives;
+    currentLevel = 0;
+    totalStarsAchieved = 0;
+    isPaused = false;
+    timerRunning = true;
+    
+    // Update life display
+    updateLifeDisplay();
+    
+    // Hide all open popups
+    hideAllPopups();
+    
+    // Update speaker button icon to match current mute state
+    if (speakerButton) {
+        const iconPath = isMuted ? 'assets/mute.png' : 'assets/speaker.png';
+        speakerButton.texture = PIXI.Texture.from(iconPath);
+    }
+    
+    // Start fresh with level 1
+    loadLevel(currentLevel);
 }
 
 
